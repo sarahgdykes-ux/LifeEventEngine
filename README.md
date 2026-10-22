@@ -1,4 +1,4 @@
-# LifeEventEngine
+# Life Decision Simulator
 
 A multi-agent life simulation engine that coordinates autonomous domain agents to simulate real-time career, financial, and personal growth events for an avatar.
 
@@ -39,68 +39,13 @@ The request requires a non-empty question, exactly two options with IDs `A` and 
 }
 ```
 
-### Illustrative Partial Response
+### Simulation report
 
-This is an illustrative response; `decisionId` is generated for each request.
+A successful response contains eight validated specialist results (four agents for each option), a Narrator synthesis with side-by-side 1-, 5-, and 10-year perspectives, and per-option breakdown scores. The Narrator is not called unless every agent-option result passes schema validation. If any specialist fails or returns invalid output, the request fails with a safe internal error rather than returning a partial or synthesized report.
 
-```json
-{
-	"decisionId": "e4b5d8e1-32a6-4f6c-b334-4be9e91ea741",
-	"results": [
-		{
-			"agent": "optimist",
-			"optionId": "A",
-			"findings": [
-				"Illustrative possibility: Graduate school could create useful opportunities to pursue the decision's goals. This is a reflection prompt, not a factual prediction."
-			],
-			"assumptions": [
-				"This scenario assumes the person can make a sustained effort toward graduate school while adapting as circumstances change."
-			],
-			"confidence": 50,
-			"uncertainties": [
-				"Personal circumstances and external events could change how well graduate school fits the question: Should I go to graduate school or move to a new city?"
-			],
-			"projections": {
-				"year1": "Illustrative: early exploration of graduate school may clarify what feels energizing and what needs adjustment.",
-				"year5": "Illustrative: continued commitment to graduate school could open new paths, while leaving room to revise the plan.",
-				"year10": "Illustrative: the experience of graduate school may become one part of a changing life story rather than a fixed outcome."
-			},
-			"status": "complete"
-		},
-		{
-			"agent": "optimist",
-			"optionId": "B",
-			"findings": [
-				"Illustrative possibility: Move to a new city could create useful opportunities to pursue the decision's goals. This is a reflection prompt, not a factual prediction."
-			],
-			"assumptions": [
-				"This scenario assumes the person can make a sustained effort toward move to a new city while adapting as circumstances change."
-			],
-			"confidence": 50,
-			"uncertainties": [
-				"Personal circumstances and external events could change how well move to a new city fits the question: Should I go to graduate school or move to a new city?"
-			],
-			"projections": {
-				"year1": "Illustrative: early exploration of move to a new city may clarify what feels energizing and what needs adjustment.",
-				"year5": "Illustrative: continued commitment to move to a new city could open new paths, while leaving room to revise the plan.",
-				"year10": "Illustrative: the experience of move to a new city may become one part of a changing life story rather than a fixed outcome."
-			},
-			"status": "complete"
-		}
-	],
-	"reportStatus": "partial",
-	"missingResults": [
-		"pessimist:A",
-		"pessimist:B",
-		"financial:A",
-		"financial:B",
-		"wellbeing:A",
-		"wellbeing:B"
-	]
-}
-```
+The individual `results` are retained in the response for inspection. Server audit logs contain only agent names, option IDs, schema-validation status, and failure type; user decision text and raw agent output are never written to logs.
 
-The report is `partial` because only Optimist is implemented. Missing agent-option pairs are listed explicitly; the API does not fabricate placeholders. A mock failure or invalid mock output is safely omitted and its key remains missing. If no usable result can be created, the API returns an internal error. The Narrator is not part of this endpoint.
+Breakdown scores use a 0–100 scale. In this template-only implementation, Financial Health, Emotional Wellbeing, and Risk Level use a neutral score of 50 with an explanation because the app does not collect enough financial figures or wellbeing baselines to produce a meaningful estimate. Higher Risk Level means greater downside exposure. These scores are placeholders, not factual predictions or advice.
 
 Errors use a stable envelope:
 
@@ -139,7 +84,7 @@ curl -i http://localhost:3000/api/simulate \
 	--data '{"question":"Should I go to graduate school or move to a new city?","options":[{"id":"A","label":"Graduate school","description":"Pursue an advanced degree."},{"id":"B","label":"Move to a new city","description":"Relocate for new opportunities."}],"goals":["career growth","personal fulfillment"],"priorities":["financial security","wellbeing"],"constraints":{"other":["limited time"]}}'
 ```
 
-Confirm HTTP 200, two `optimist` results for `A` and `B`, `reportStatus: "partial"`, and the six missing pairs shown above. Check malformed JSON separately:
+Confirm HTTP 200, eight specialist results, `reportStatus: "complete"`, two synthesized option timelines, and no missing pairs. Check malformed JSON separately:
 
 ```sh
 curl -i http://localhost:3000/api/simulate \
@@ -151,4 +96,4 @@ This should return HTTP 400 with code `INVALID_REQUEST`.
 
 ## Current Limitations
 
-Only the deterministic Optimist mock runs. Pessimist, Financial, and Wellbeing results are missing; there is no Narrator, persistence, authentication, or live AI integration. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.
+All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Breakdown scores are neutral placeholders until a grounded scoring method and appropriate personal baselines are defined. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.

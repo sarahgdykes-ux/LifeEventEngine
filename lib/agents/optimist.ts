@@ -24,6 +24,7 @@ export class OptimistAgent implements SpecialistAgent {
         year5: `Illustrative: continued commitment to ${option.label.toLowerCase()} could open new paths, while leaving room to revise the plan.`,
         year10: `Illustrative: the experience of ${option.label.toLowerCase()} may become one part of a changing life story rather than a fixed outcome.`,
       },
+      scores: {},
       status: "complete",
     };
   }

@@ -103,7 +103,7 @@ export default function SimulationApp() {
           {loading ? (
             <div className="loading-panel" role="status">
               <span className="loading-spinner" aria-hidden="true" />
-              <div><h3>Considering both options</h3><p>Your first perspective is being prepared. This can take a moment.</p></div>
+              <div><h3>Considering both options</h3><p>Four perspectives are being prepared in parallel. This can take a moment.</p></div>
             </div>
           ) : report && reportedDecision ? (
             <SimulationReportView report={report} decision={reportedDecision} />
@@ -111,8 +111,8 @@ export default function SimulationApp() {
             <div className="empty-report">
               <div className="empty-mark" aria-hidden="true"><span /><span /></div>
               <h3>A little clarity starts here.</h3>
-              <p>Your report will appear here after you explore a decision. It will include only perspectives that are currently available.</p>
-              <span className="empty-footnote">No scores. No predetermined answers.</span>
+              <p>Your report will appear after all four perspectives pass validation and their side-by-side synthesis is complete.</p>
+              <span className="empty-footnote">Exploratory scores, not predictions.</span>
             </div>
           )}
         </section>

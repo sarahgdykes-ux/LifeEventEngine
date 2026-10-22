@@ -1,6 +1,6 @@
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentName } from "@/lib/agents/types";
-import type { AgentResult, SimulationReport } from "@/lib/schemas/simulation";
+import type { AgentResult, OptionSynthesis, SimulationReport } from "@/lib/schemas/simulation";
 
 interface SimulationReportViewProps {
   report: SimulationReport;
@@ -14,11 +14,17 @@ const AGENT_LABELS: Record<AgentName, string> = {
   wellbeing: "Wellbeing",
 };
 
+const SCORE_LABELS = {
+  financialHealth: "Financial health",
+  emotionalWellbeing: "Emotional wellbeing",
+  riskLevel: "Risk level",
+} as const;
+
 function AgentResultCard({ result }: { result: AgentResult }) {
   return (
     <article className="agent-result">
       <div className="result-title-row">
-        <div><p className="result-kicker">AVAILABLE PERSPECTIVE</p><h3>{AGENT_LABELS[result.agent]} <span>· Option {result.optionId}</span></h3></div>
+        <div><p className="result-kicker">VALIDATED PERSPECTIVE</p><h3>{AGENT_LABELS[result.agent]} <span>· Option {result.optionId}</span></h3></div>
         <span className={`result-status result-status-${result.status}`}>{result.status}</span>
       </div>
       <section className="result-section">
@@ -35,34 +41,42 @@ function AgentResultCard({ result }: { result: AgentResult }) {
           <ul>{result.uncertainties.map((uncertainty, index) => <li key={`${index}-${uncertainty}`}>{uncertainty}</li>)}</ul>
         </section>
       </div>
-      <div className="projections">
-        <h4>Possible horizons</h4>
-        <div className="projection-grid">
-          <section><span>1 year</span><p>{result.projections.year1}</p></section>
-          <section><span>5 years</span><p>{result.projections.year5}</p></section>
-          <section><span>10 years</span><p>{result.projections.year10}</p></section>
-        </div>
-      </div>
       <p className="confidence-note">Self-reported confidence: <strong>{result.confidence}%</strong></p>
     </article>
   );
 }
 
-function MissingResultsNotice({ missingResults }: { missingResults: string[] }) {
-  if (!missingResults.length) return null;
-
+function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
   return (
-    <section className="missing-notice" aria-labelledby="missing-title">
-      <h3 id="missing-title">Perspectives not available yet</h3>
-      <p>These views have not been generated, so they are not included as results.</p>
-      <ul>
-        {missingResults.map((key) => {
-          const [agent, optionId] = key.split(":");
-          const agentLabel = AGENT_LABELS[agent as AgentName] ?? agent;
-          return <li key={key}><span>{agentLabel} perspective · Option {optionId}</span><details><summary>Key</summary><code>{key}</code></details></li>;
-        })}
-      </ul>
+    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} breakdown scores`}>
+      {Object.entries(synthesis.breakdownScores).map(([name, score]) => (
+        <article className="score-card" key={name}>
+          <div><h4>{SCORE_LABELS[name as keyof typeof SCORE_LABELS]}</h4><strong>{score.value}<span>/100</span></strong></div>
+          <p>{score.rationale}</p>
+        </article>
+      ))}
     </section>
+  );
+}
+
+function OptionSynthesis({ synthesis, label }: { synthesis: OptionSynthesis; label: string }) {
+  return (
+    <article className="option-synthesis">
+      <h3><span className={`option-marker option-marker-${synthesis.optionId.toLowerCase()}`}>{synthesis.optionId}</span>{label}</h3>
+      <BreakdownScores synthesis={synthesis} />
+      <div className="synthesis-timeline">
+        {(["year1", "year5", "year10"] as const).map((horizon) => (
+          <section className="synthesis-horizon" key={horizon}>
+            <h4>{horizon === "year1" ? "1 year" : horizon === "year5" ? "5 years" : "10 years"}</h4>
+            <ul>
+              {synthesis.timeline[horizon].map(({ agent, projection }) => (
+                <li key={agent}><strong>{AGENT_LABELS[agent]}</strong><p>{projection}</p></li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -77,13 +91,21 @@ export default function SimulationReportView({ report, decision }: SimulationRep
       <div className="report-options" aria-label="Options in this decision">
         {decision.options.map((option) => <p key={option.id}><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span></p>)}
       </div>
-      {report.results.length ? (
+      <h3 className="synthesis-heading">Side-by-side possible futures</h3>
+      <p className="score-explanation">Scores use a 0–100 scale, where higher risk means greater downside exposure. Current neutral scores are placeholders because the simulator does not yet collect personal financial or wellbeing baselines; they are not measured predictions or advice.</p>
+      <div className="synthesis-options">
+        {report.synthesis.options.map((optionSynthesis) => {
+          const option = decision.options.find(({ id }) => id === optionSynthesis.optionId);
+          return option && <OptionSynthesis key={option.id} synthesis={optionSynthesis} label={option.label} />;
+        })}
+      </div>
+      <details className="raw-agent-results">
+        <summary>Inspect individual agent outputs</summary>
         <div className="result-list">
           {report.results.map((result) => <AgentResultCard key={`${result.agent}:${result.optionId}`} result={result} />)}
         </div>
-      ) : <p className="no-results">No perspective results are available for this report.</p>}
-      <MissingResultsNotice missingResults={report.missingResults} />
-      <p className="report-disclaimer">These are prompts for reflection, not predictions or recommendations.</p>
+      </details>
+      <p className="report-disclaimer">These illustrative scenarios are prompts for reflection, not predictions or recommendations.</p>
     </div>
   );
 }

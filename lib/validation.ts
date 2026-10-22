@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AGENT_NAMES, OPTION_IDS } from "@/lib/agents/types";
 import { DecisionInputSchema, type DecisionInput } from "@/lib/schemas/decision";
 import {
   AgentResultSchema,
@@ -28,6 +29,21 @@ export function validateDecisionInput(value: unknown): DecisionInputValidation {
 
 export function validateAgentResults(value: unknown): AgentResult[] {
   return AgentResultsSchema.parse(value);
+}
+
+export function validateCompleteAgentHandoff(value: unknown): AgentResult[] {
+  const results = validateAgentResults(value);
+  const expected = AGENT_NAMES.flatMap((agent) => OPTION_IDS.map((optionId) => `${agent}:${optionId}`));
+  const actual = new Set(results.map((result) => `${result.agent}:${result.optionId}`));
+
+  if (results.length !== expected.length || expected.some((key) => !actual.has(key))) {
+    throw new Error("Narrator requires one valid result from every specialist for both options");
+  }
+  if (results.some((result) => result.status !== "complete")) {
+    throw new Error("Narrator requires every specialist result to be complete");
+  }
+
+  return results;
 }
 
 export function validateAgentResult(value: unknown): AgentResult {
