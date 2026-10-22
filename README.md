@@ -1,5 +1,7 @@
 # LifeEventEngine
 
+A multi-agent life simulation engine that coordinates autonomous domain agents to simulate real-time career, financial, and personal growth events for an avatar.
+
 ## Simulation API
 
 `POST /api/simulate` accepts the shared `DecisionInput` contract and returns a shared `SimulationReport`.
