@@ -125,6 +125,8 @@ npm run build
 
 No AI provider or API key is used by this slice.
 
+The home page provides the integrated decision form and partial report. Enter a question, two option labels, at least one comma-separated goal and priority, and optional comma-separated constraints. Submit to the local `POST /api/simulate` route; the form values stay available if the request fails. The report is checked against the shared schema and clearly lists perspectives that are not yet available.
+
 ### Manual Smoke Test
 
 With the dev server running at `http://localhost:3000`, submit a valid request:
@@ -147,4 +149,4 @@ This should return HTTP 400 with code `INVALID_REQUEST`.
 
 ## Current Limitations
 
-Only the deterministic Optimist mock runs. Pessimist, Financial, and Wellbeing results are missing; there is no Narrator, persistence, authentication, or live AI integration. The home page remains a Day 1 foundation placeholder; frontend form and partial-report rendering are the next integration task.
+Only the deterministic Optimist mock runs. Pessimist, Financial, and Wellbeing results are missing; there is no Narrator, persistence, authentication, or live AI integration. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.
