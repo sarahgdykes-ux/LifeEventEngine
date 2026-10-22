@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleDecision } from "@/tests/fixtures/decision";
-import { validateAgentResults, validateDecisionInput } from "@/lib/validation";
+import { validateAgentResults, validateDecisionInput, validateSimulationReport } from "@/lib/validation";
 
 const validResult = {
   agent: "optimist",
@@ -38,5 +38,14 @@ describe("shared runtime validation", () => {
 
   it("rejects duplicate agent-option results", () => {
     expect(() => validateAgentResults([validResult, validResult])).toThrow(/Duplicate agent-option result/);
+  });
+
+  it("rejects reports that omit an expected missing-result key", () => {
+    expect(() => validateSimulationReport({
+      decisionId: "decision-1",
+      results: [validResult],
+      reportStatus: "partial",
+      missingResults: [],
+    })).toThrow(/missingResults must list every absent agent-option result/);
   });
 });

@@ -3,10 +3,12 @@ import { OptionIdSchema } from "@/lib/agents/types";
 
 const RequiredTextSchema = z.string().trim().min(1, "Must not be empty");
 const TextListSchema = z.array(RequiredTextSchema);
+const NonEmptyTextListSchema = TextListSchema.min(1, "Must contain at least one item");
 
 export const DecisionOptionSchema = z.object({
   id: OptionIdSchema,
   label: RequiredTextSchema,
+  description: RequiredTextSchema.optional(),
 });
 
 export const DecisionInputSchema = z.object({
@@ -19,9 +21,12 @@ export const DecisionInputSchema = z.object({
     .refine(([first, second]) => [first.id, second.id].includes("A") && [first.id, second.id].includes("B"), {
       message: "Options must include IDs A and B",
     }),
-  goals: TextListSchema,
-  priorities: TextListSchema,
-  constraints: TextListSchema,
+  goals: NonEmptyTextListSchema,
+  priorities: NonEmptyTextListSchema,
+  constraints: z.union([
+    TextListSchema,
+    z.object({ other: TextListSchema }),
+  ]),
 });
 
 export type DecisionOption = z.infer<typeof DecisionOptionSchema>;
