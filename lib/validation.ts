@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { DecisionInputSchema, type DecisionInput } from "@/lib/schemas/decision";
 import {
+  AgentResultSchema,
   AgentResultsSchema,
   SimulationReportSchema,
   type AgentResult,
@@ -27,6 +28,10 @@ export function validateDecisionInput(value: unknown): DecisionInputValidation {
 
 export function validateAgentResults(value: unknown): AgentResult[] {
   return AgentResultsSchema.parse(value);
+}
+
+export function validateAgentResult(value: unknown): AgentResult {
+  return AgentResultSchema.parse(value);
 }
 
 export function validateSimulationReport(value: unknown): SimulationReport {

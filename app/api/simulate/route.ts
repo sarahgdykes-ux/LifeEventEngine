@@ -1,5 +1,11 @@
 import { runSimulation } from "@/lib/orchestrator";
+import type { SimulationApiError } from "@/lib/schemas/api";
 import { validateDecisionInput } from "@/lib/validation";
+
+function errorResponse(code: string, message: string, status: number): Response {
+  const body: SimulationApiError = { error: { code, message } };
+  return Response.json(body, { status });
+}
 
 export async function POST(request: Request): Promise<Response> {
   let payload: unknown;
@@ -7,21 +13,21 @@ export async function POST(request: Request): Promise<Response> {
   try {
     payload = await request.json();
   } catch {
-    return Response.json({ error: "Request body must be valid JSON" }, { status: 400 });
+    return errorResponse("INVALID_REQUEST", "Request body must be valid JSON.", 400);
   }
 
   const validation = validateDecisionInput(payload);
   if (!validation.success) {
-    return Response.json(
-      { error: "Invalid decision input", details: validation.errors },
-      { status: 400 },
-    );
+    return errorResponse("INVALID_REQUEST", "Request body does not match DecisionInput.", 400);
   }
 
   try {
     const report = await runSimulation(validation.data);
     return Response.json(report, { status: 200 });
-  } catch {
-    return Response.json({ error: "Simulation could not be completed" }, { status: 500 });
+  } catch (error) {
+    console.error("Simulation request failed", {
+      failureType: error instanceof Error ? error.name : "unknown_error",
+    });
+    return errorResponse("INTERNAL_ERROR", "Simulation could not be completed.", 500);
   }
 }
