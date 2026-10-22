@@ -5,7 +5,8 @@ import { SimulationReportSchema } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
 
 describe("POST /api/simulate", () => {
-  it("returns a typed partial report for a valid decision", async () => {
+  it("returns a typed complete report for a valid decision", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const response = await POST(new Request("http://localhost/api/simulate", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -15,20 +16,11 @@ describe("POST /api/simulate", () => {
 
     expect(response.status).toBe(200);
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
-    expect(report.reportStatus).toBe("partial");
-    expect(report.results).toHaveLength(2);
-    expect(report.results.map(({ agent, optionId }: { agent: string; optionId: string }) => `${agent}:${optionId}`)).toEqual([
-      "optimist:A",
-      "optimist:B",
-    ]);
-    expect(report.missingResults).toEqual([
-      "pessimist:A",
-      "pessimist:B",
-      "financial:A",
-      "financial:B",
-      "wellbeing:A",
-      "wellbeing:B",
-    ]);
+    expect(report.reportStatus).toBe("complete");
+    expect(report.results).toHaveLength(8);
+    expect(report.synthesis.options).toHaveLength(2);
+    expect(report.missingResults).toEqual([]);
+    log.mockRestore();
   });
 
   it.each([
