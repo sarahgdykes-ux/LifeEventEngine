@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleDecision } from "@/tests/fixtures/decision";
+import { runSimulation } from "@/lib/orchestrator";
 import { validateAgentResults, validateDecisionInput, validateSimulationReport } from "@/lib/validation";
 
 const validResult = {
@@ -40,12 +41,19 @@ describe("shared runtime validation", () => {
     expect(() => validateAgentResults([validResult, validResult])).toThrow(/Duplicate agent-option result/);
   });
 
-  it("rejects reports that omit an expected missing-result key", () => {
+  it("requires perspective-specific scores before a result can pass validation", () => {
+    expect(() => validateAgentResults([{
+      ...validResult,
+      agent: "financial",
+    }])).toThrow(/financial result must include its required breakdown score/);
+  });
+
+  it("rejects a report that omits an expected result from its audit list", async () => {
+    const report = await runSimulation(sampleDecision);
+
     expect(() => validateSimulationReport({
-      decisionId: "decision-1",
-      results: [validResult],
-      reportStatus: "partial",
-      missingResults: [],
+      ...report,
+      missingResults: ["optimist:A"],
     })).toThrow(/missingResults must list every absent agent-option result/);
   });
 });

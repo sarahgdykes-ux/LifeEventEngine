@@ -5,10 +5,59 @@ import {
   OPTION_IDS,
   OptionIdSchema,
   TIME_HORIZONS,
+  type AgentName,
 } from "@/lib/agents/types";
 
 const RequiredTextSchema = z.string().trim().min(1, "Must not be empty");
 const TextListSchema = z.array(RequiredTextSchema).min(1, "Must contain at least one item");
+
+export const ScoreAssessmentSchema = z.object({
+  value: z.number().int().min(0).max(100),
+  rationale: RequiredTextSchema,
+});
+
+export const BreakdownScoresSchema = z.object({
+  financialHealth: ScoreAssessmentSchema.optional(),
+  emotionalWellbeing: ScoreAssessmentSchema.optional(),
+  riskLevel: ScoreAssessmentSchema.optional(),
+});
+
+export const PerspectiveProjectionSchema = z.object({
+  agent: AgentNameSchema,
+  projection: RequiredTextSchema,
+});
+
+const HorizonPerspectivesSchema = z.array(PerspectiveProjectionSchema).length(AGENT_NAMES.length)
+  .superRefine((perspectives, context) => {
+    const names = new Set(perspectives.map(({ agent }) => agent));
+    if (names.size !== AGENT_NAMES.length || AGENT_NAMES.some((agent) => !names.has(agent))) {
+      context.addIssue({ code: "custom", message: "Each horizon must include all four perspectives" });
+    }
+  });
+
+export const OptionSynthesisSchema = z.object({
+  optionId: OptionIdSchema,
+  timeline: z.object({
+    year1: HorizonPerspectivesSchema,
+    year5: HorizonPerspectivesSchema,
+    year10: HorizonPerspectivesSchema,
+  }),
+  breakdownScores: z.object({
+    financialHealth: ScoreAssessmentSchema,
+    emotionalWellbeing: ScoreAssessmentSchema,
+    riskLevel: ScoreAssessmentSchema,
+  }),
+});
+
+export const SimulationSynthesisSchema = z.object({
+  options: z.array(OptionSynthesisSchema).length(OPTION_IDS.length)
+    .refine((options) => new Set(options.map(({ optionId }) => optionId)).size === OPTION_IDS.length, {
+      message: "Synthesis must include both options exactly once",
+    }),
+});
+
+export type OptionSynthesis = z.infer<typeof OptionSynthesisSchema>;
+export type SimulationSynthesis = z.infer<typeof SimulationSynthesisSchema>;
 
 export const AgentResultSchema = z.object({
   agent: AgentNameSchema,
@@ -26,7 +75,19 @@ export const AgentResultSchema = z.object({
     year5: RequiredTextSchema,
     year10: RequiredTextSchema,
   }),
+  scores: BreakdownScoresSchema.default({}),
   status: z.enum(["complete", "partial", "failed"]),
+}).superRefine((result, context) => {
+  const missingScore = (result.agent === "financial" && result.scores.financialHealth === undefined)
+    || (result.agent === "wellbeing" && result.scores.emotionalWellbeing === undefined)
+    || (result.agent === "pessimist" && result.scores.riskLevel === undefined);
+  if (missingScore) {
+    context.addIssue({
+      code: "custom",
+      message: `${result.agent} result must include its required breakdown score`,
+      path: ["scores"],
+    });
+  }
 });
 
 export type AgentResult = z.infer<typeof AgentResultSchema>;
@@ -56,6 +117,7 @@ export const SimulationReportSchema = z
   .object({
     decisionId: RequiredTextSchema,
     results: AgentResultsSchema,
+    synthesis: SimulationSynthesisSchema,
     reportStatus: z.enum(["complete", "partial", "failed"]),
     missingResults: z.array(MissingResultSchema),
   })
@@ -78,6 +140,25 @@ export const SimulationReportSchema = z
     if (report.reportStatus === "complete" && (expectedMissing.length > 0 || report.results.some((result) => result.status !== "complete"))) {
       context.addIssue({ code: "custom", message: "A complete report requires eight complete results", path: ["reportStatus"] });
     }
+    if (report.reportStatus !== "complete" || expectedMissing.length > 0 || report.results.length !== AGENT_NAMES.length * OPTION_IDS.length) {
+      context.addIssue({ code: "custom", message: "Narrator synthesis requires all eight complete agent results", path: ["synthesis"] });
+    }
+    report.synthesis.options.forEach((option, index) => {
+      const hasScore = (agent: AgentName, scoreName: keyof AgentResult["scores"]) =>
+        report.results.some((result) => result.agent === agent
+          && result.optionId === option.optionId
+          && result.scores[scoreName] !== undefined);
+
+      if (!hasScore("financial", "financialHealth")) {
+        context.addIssue({ code: "custom", message: "Financial result must provide the financial health score", path: ["synthesis", "options", index] });
+      }
+      if (!hasScore("wellbeing", "emotionalWellbeing")) {
+        context.addIssue({ code: "custom", message: "Wellbeing result must provide the emotional wellbeing score", path: ["synthesis", "options", index] });
+      }
+      if (!hasScore("pessimist", "riskLevel")) {
+        context.addIssue({ code: "custom", message: "Pessimist result must provide the risk level score", path: ["synthesis", "options", index] });
+      }
+    });
   });
 
 export type SimulationReport = z.infer<typeof SimulationReportSchema>;
