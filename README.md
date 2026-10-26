@@ -41,7 +41,7 @@ The request requires a non-empty question, exactly two options with IDs `A` and 
 
 ### Simulation report
 
-A successful response contains eight validated specialist results (four agents for each option), a Narrator synthesis with side-by-side 1-, 5-, and 10-year perspectives, and per-option breakdown scores. The Narrator is not called unless every agent-option result passes schema validation. If any specialist fails or returns invalid output, the request fails with a safe internal error rather than returning a partial or synthesized report.
+A complete response contains eight validated specialist results (four agents for each option), a Narrator synthesis with side-by-side 1-, 5-, and 10-year perspectives, and per-option breakdown scores. The Narrator is called only when every expected agent-option result is unique, valid, and complete. If a specialist fails, returns invalid output, or produces a duplicate key, the API returns a validated `partial` or `failed` report with the available valid results, `synthesis: null`, and stable missing-result keys such as `financial:A`. A report is `failed` when it contains no complete specialist results and `partial` when it contains at least one but fewer than eight.
 
 The individual `results` are retained in the response for inspection. Specialist templates use the submitted question, goals, priorities, constraints, and option descriptions to frame distinct risk, financial, and wellbeing considerations. Projections are illustrative prompts, not verified facts or reliable predictions; confidence is a self-reported analysis rating, not a calibrated probability. Server audit logs contain only agent names, option IDs, schema-validation status, and failure type; user decision text and raw agent output are never written to logs.
 
@@ -58,7 +58,7 @@ Errors use a stable envelope:
 }
 ```
 
-Invalid JSON or input returns HTTP 400 with code `INVALID_REQUEST`. Unexpected simulation failures return HTTP 500 with code `INTERNAL_ERROR` and message `Simulation could not be completed.` Internal exception details are not returned.
+Invalid JSON or input returns HTTP 400 with code `INVALID_REQUEST`. Unexpected orchestration or synthesis failures return HTTP 500 with code `INTERNAL_ERROR` and message `Simulation could not be completed.` Specialist execution failures are represented as `partial` or `failed` reports; internal exception details are not returned.
 
 ## Local Development
 
@@ -84,7 +84,7 @@ curl -i http://localhost:3000/api/simulate \
 	--data '{"question":"Should I go to graduate school or move to a new city?","options":[{"id":"A","label":"Graduate school","description":"Pursue an advanced degree."},{"id":"B","label":"Move to a new city","description":"Relocate for new opportunities."}],"goals":["career growth","personal fulfillment"],"priorities":["financial security","wellbeing"],"constraints":{"other":["limited time"]}}'
 ```
 
-Confirm HTTP 200, eight specialist results, `reportStatus: "complete"`, two synthesized option timelines, and no missing pairs. Check malformed JSON separately:
+Confirm HTTP 200, eight specialist results, `reportStatus: "complete"`, two synthesized option timelines, and no missing pairs. If any specialist is unavailable or returns invalid output, the API instead returns HTTP 200 with a `partial` or `failed` status, a null synthesis, and its missing agent-option keys. Check malformed JSON separately:
 
 ```sh
 curl -i http://localhost:3000/api/simulate \
@@ -96,4 +96,4 @@ This should return HTTP 400 with code `INVALID_REQUEST`.
 
 ## Current Limitations
 
-All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Breakdown scores are neutral placeholders, not forecasts, until a grounded scoring method and appropriate personal baselines are defined. Invalid specialist output or a thrown specialist error aborts simulation rather than creating a successful placeholder result. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.
+All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Breakdown scores are neutral placeholders, not forecasts, until a grounded scoring method and appropriate personal baselines are defined. Invalid specialist output, duplicate results, or thrown specialist errors are not replaced with fabricated results; incomplete reports omit synthesis and identify missing pairs. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.

@@ -117,15 +117,20 @@ export const SimulationReportSchema = z
   .object({
     decisionId: RequiredTextSchema,
     results: AgentResultsSchema,
-    synthesis: SimulationSynthesisSchema,
+    synthesis: SimulationSynthesisSchema.nullable(),
     reportStatus: z.enum(["complete", "partial", "failed"]),
     missingResults: z.array(MissingResultSchema),
   })
   .superRefine((report, context) => {
-    const resultIds = new Set(report.results.map((result) => `${result.agent}:${result.optionId}`));
+    const completeResultIds = new Set(
+      report.results
+        .filter((result) => result.status === "complete")
+        .map((result) => `${result.agent}:${result.optionId}`),
+    );
     const expectedMissing = AGENT_NAMES.flatMap((agent) => OPTION_IDS.map((optionId) => `${agent}:${optionId}`))
-      .filter((identifier) => !resultIds.has(identifier));
+      .filter((identifier) => !completeResultIds.has(identifier));
     const reportedMissing = new Set(report.missingResults);
+    const completeResultCount = completeResultIds.size;
 
     if (reportedMissing.size !== report.missingResults.length) {
       context.addIssue({ code: "custom", message: "Missing result identifiers must be unique", path: ["missingResults"] });
@@ -137,13 +142,22 @@ export const SimulationReportSchema = z
         path: ["missingResults"],
       });
     }
-    if (report.reportStatus === "complete" && (expectedMissing.length > 0 || report.results.some((result) => result.status !== "complete"))) {
-      context.addIssue({ code: "custom", message: "A complete report requires eight complete results", path: ["reportStatus"] });
+    if (report.reportStatus === "complete" && (expectedMissing.length > 0 || report.synthesis === null)) {
+      context.addIssue({ code: "custom", message: "A complete report requires eight complete results and a synthesis", path: ["reportStatus"] });
     }
-    if (report.reportStatus !== "complete" || expectedMissing.length > 0 || report.results.length !== AGENT_NAMES.length * OPTION_IDS.length) {
-      context.addIssue({ code: "custom", message: "Narrator synthesis requires all eight complete agent results", path: ["synthesis"] });
+    if (report.reportStatus !== "complete" && report.synthesis !== null) {
+      context.addIssue({ code: "custom", message: "Incomplete reports cannot include a synthesis", path: ["synthesis"] });
     }
-    report.synthesis.options.forEach((option, index) => {
+    const expectedStatus = completeResultCount === AGENT_NAMES.length * OPTION_IDS.length
+      ? "complete"
+      : completeResultCount > 0
+        ? "partial"
+        : "failed";
+    if (report.reportStatus !== expectedStatus) {
+      context.addIssue({ code: "custom", message: `Report status must be ${expectedStatus} for the validated complete results`, path: ["reportStatus"] });
+    }
+
+    report.synthesis?.options.forEach((option, index) => {
       const hasScore = (agent: AgentName, scoreName: keyof AgentResult["scores"]) =>
         report.results.some((result) => result.agent === agent
           && result.optionId === option.optionId

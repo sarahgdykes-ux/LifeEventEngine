@@ -3,6 +3,7 @@ import type { SpecialistAgent } from "@/lib/agents/types";
 import { SPECIALIST_AGENTS, runSimulation } from "@/lib/orchestrator";
 import { narrator } from "@/lib/narrator";
 import type { AgentResult } from "@/lib/schemas/simulation";
+import { SimulationReportSchema } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
 
 describe("runSimulation", () => {
@@ -24,6 +25,7 @@ describe("runSimulation", () => {
       "wellbeing:B",
     ]);
     expect(report.missingResults).toEqual([]);
+    if (!report.synthesis) throw new Error("Expected complete report synthesis");
     expect(report.synthesis.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
     expect(report.synthesis.options[0].timeline.year1).toHaveLength(4);
     expect(report.synthesis.options[0].breakdownScores).toEqual({
@@ -55,7 +57,54 @@ describe("runSimulation", () => {
     log.mockRestore();
   });
 
-  it("does not invoke the narrator when any worker fails schema validation", async () => {
+  it("returns a partial report when an agent returns no output", async () => {
+    const customAgents = SPECIALIST_AGENTS.map((agent) => ({
+      ...agent,
+      analyze: vi.fn(async (decision, option) => {
+        if (agent.name === "financial" && option.id === "A") return undefined as unknown as AgentResult;
+        return agent.analyze(decision, option);
+      }),
+    }));
+    const narrate = vi.spyOn(narrator, "synthesize");
+
+    const report = await runSimulation(sampleDecision, customAgents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.missingResults).toEqual(["financial:A"]);
+    expect(report.results).toHaveLength(7);
+    expect(report.synthesis).toBeNull();
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    expect(narrate).not.toHaveBeenCalled();
+    narrate.mockRestore();
+  });
+
+  it("rejects duplicate agent-option outputs and marks the affected keys missing", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const agents = [
+      ...SPECIALIST_AGENTS.filter(({ name }) => name !== "financial"),
+      SPECIALIST_AGENTS.find(({ name }) => name === "optimist")!,
+    ];
+
+    const report = await runSimulation(sampleDecision, agents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.results).toHaveLength(4);
+    expect(report.missingResults).toEqual([
+      "optimist:A",
+      "optimist:B",
+      "financial:A",
+      "financial:B",
+    ]);
+    expect(report.synthesis).toBeNull();
+    expect(log).toHaveBeenCalledWith("Simulation duplicate agent results rejected", {
+      key: "optimist:A",
+      duplicateCount: 2,
+    });
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    log.mockRestore();
+  });
+
+  it("returns a partial report when an agent returns invalid output", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const customAgents = SPECIALIST_AGENTS.map((agent) => ({
       ...agent,
@@ -68,9 +117,12 @@ describe("runSimulation", () => {
     }));
     const narrate = vi.spyOn(narrator, "synthesize");
 
-    await expect(runSimulation(sampleDecision, customAgents)).rejects.toThrow(
-      "Simulation aborted because one or more specialist results failed validation or analysis",
-    );
+    const report = await runSimulation(sampleDecision, customAgents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.missingResults).toEqual(["financial:A"]);
+    expect(report.results).toHaveLength(7);
+    expect(report.synthesis).toBeNull();
     expect(narrate).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
       key: "financial:A",
@@ -82,7 +134,7 @@ describe("runSimulation", () => {
     log.mockRestore();
   });
 
-  it("aborts and logs when a specialist throws", async () => {
+  it("returns a partial report and logs safely when a specialist throws", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const customAgents = SPECIALIST_AGENTS.map((agent) => ({
       ...agent,
@@ -95,9 +147,12 @@ describe("runSimulation", () => {
     }));
     const narrate = vi.spyOn(narrator, "synthesize");
 
-    await expect(runSimulation(sampleDecision, customAgents)).rejects.toThrow(
-      "Simulation aborted because one or more specialist results failed validation or analysis",
-    );
+    const report = await runSimulation(sampleDecision, customAgents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.missingResults).toEqual(["pessimist:A"]);
+    expect(report.results).toHaveLength(7);
+    expect(report.synthesis).toBeNull();
     expect(narrate).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
       key: "pessimist:A",
@@ -109,12 +164,25 @@ describe("runSimulation", () => {
     log.mockRestore();
   });
 
-  it("rejects incomplete or duplicate specialist registries", async () => {
-    await expect(runSimulation(sampleDecision, SPECIALIST_AGENTS.slice(0, 3))).rejects.toThrow(
-      "Simulation requires exactly one implementation of each specialist",
-    );
-    await expect(runSimulation(sampleDecision, [...SPECIALIST_AGENTS, SPECIALIST_AGENTS[0]])).rejects.toThrow(
-      "Simulation requires exactly one implementation of each specialist",
-    );
+  it("returns a partial report when successes and failures are mixed", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const customAgents = SPECIALIST_AGENTS.map((agent) => ({
+      ...agent,
+      analyze: vi.fn(async (decision, option) => {
+        if (agent.name === "financial" && option.id === "A") return undefined as unknown as AgentResult;
+        if (agent.name === "wellbeing" && option.id === "B") throw new Error("private worker detail");
+        return agent.analyze(decision, option);
+      }),
+    }));
+
+    const report = await runSimulation(sampleDecision, customAgents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.missingResults).toEqual(["financial:A", "wellbeing:B"]);
+    expect(report.results).toHaveLength(6);
+    expect(report.synthesis).toBeNull();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private worker detail");
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    log.mockRestore();
   });
 });

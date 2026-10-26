@@ -23,6 +23,40 @@ describe("POST /api/simulate", () => {
     log.mockRestore();
   });
 
+  it("returns an explicit failed report when no specialist result is complete", async () => {
+    const missingResults = [
+      "optimist:A",
+      "optimist:B",
+      "pessimist:A",
+      "pessimist:B",
+      "financial:A",
+      "financial:B",
+      "wellbeing:A",
+      "wellbeing:B",
+    ];
+    const simulation = vi.spyOn(orchestrator, "runSimulation").mockResolvedValueOnce({
+      decisionId: "test-decision",
+      results: [],
+      synthesis: null,
+      reportStatus: "failed",
+      missingResults,
+    });
+
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sampleDecision),
+    }));
+    const report = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    expect(report.reportStatus).toBe("failed");
+    expect(report.synthesis).toBeNull();
+    expect(report.missingResults).toEqual(missingResults);
+    simulation.mockRestore();
+  });
+
   it.each([
     ["missing question", { ...sampleDecision, question: "" }],
     ["missing option", { ...sampleDecision, options: [sampleDecision.options[0]] }],

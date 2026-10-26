@@ -91,14 +91,24 @@ export default function SimulationReportView({ report, decision }: SimulationRep
       <div className="report-options" aria-label="Options in this decision">
         {decision.options.map((option) => <p key={option.id}><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span></p>)}
       </div>
-      <h3 className="synthesis-heading">Side-by-side possible futures</h3>
-      <p className="score-explanation">Scores use a 0–100 scale, where higher risk means greater downside exposure. Current neutral scores are placeholders because the simulator does not yet collect personal financial or wellbeing baselines; they are not measured predictions or advice.</p>
-      <div className="synthesis-options">
-        {report.synthesis.options.map((optionSynthesis) => {
-          const option = decision.options.find(({ id }) => id === optionSynthesis.optionId);
-          return option && <OptionSynthesis key={option.id} synthesis={optionSynthesis} label={option.label} />;
-        })}
-      </div>
+      {report.synthesis ? (
+        <>
+          <h3 className="synthesis-heading">Side-by-side possible futures</h3>
+          <p className="score-explanation">Scores use a 0–100 scale, where higher risk means greater downside exposure. Current neutral scores are placeholders because the simulator does not yet collect personal financial or wellbeing baselines; they are not measured predictions or advice.</p>
+          <div className="synthesis-options">
+            {report.synthesis.options.map((optionSynthesis) => {
+              const option = decision.options.find(({ id }) => id === optionSynthesis.optionId);
+              return option && <OptionSynthesis key={option.id} synthesis={optionSynthesis} label={option.label} />;
+            })}
+          </div>
+        </>
+      ) : (
+        <section className="report-unavailable">
+          <h3>Side-by-side summary unavailable</h3>
+          <p>The specialist set did not complete, so no synthesized summary was produced.</p>
+          {report.missingResults.length > 0 && <p>Incomplete results: {report.missingResults.join(", ")}</p>}
+        </section>
+      )}
       <details className="raw-agent-results">
         <summary>Inspect individual agent outputs</summary>
         <div className="result-list">
