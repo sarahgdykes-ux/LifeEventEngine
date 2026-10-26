@@ -1,19 +1,42 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import DecisionForm from "@/components/decision-form";
 import SimulationReportView from "@/components/simulation-report-view";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import { SimulationApiErrorSchema } from "@/lib/schemas/api";
 import { SimulationReportSchema, type SimulationReport } from "@/lib/schemas/simulation";
 
+type RequestErrorKind = "validation" | "server" | "network" | "response";
+
+interface RequestError {
+  kind: RequestErrorKind;
+  message: string;
+}
+
+class SimulationRequestError extends Error {
+  constructor(readonly kind: RequestErrorKind, message: string) {
+    super(message);
+  }
+}
+
+const ERROR_TITLES: Record<RequestErrorKind, string> = {
+  validation: "Check your decision details",
+  server: "The simulation could not finish",
+  network: "Connection problem",
+  response: "Unexpected response",
+};
+
 export default function SimulationApp() {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<RequestError | null>(null);
   const [report, setReport] = useState<SimulationReport | null>(null);
   const [reportedDecision, setReportedDecision] = useState<DecisionInput | null>(null);
+  const submissionInProgress = useRef(false);
 
   async function submitDecision(decision: DecisionInput) {
+    if (submissionInProgress.current) return;
+    submissionInProgress.current = true;
     setLoading(true);
     setError(null);
     setReport(null);
@@ -30,35 +53,56 @@ export default function SimulationApp() {
       try {
         payload = await response.json();
       } catch {
-        throw new Error(response.ok
-          ? "The simulation returned an unreadable response. Please try again."
-          : `The server returned an unexpected error (${response.status}). Please try again.`);
+        if (response.status >= 500) {
+          throw new SimulationRequestError("server", `The server returned an error (${response.status}). Please try again.`);
+        }
+        throw new SimulationRequestError(
+          response.ok ? "response" : "validation",
+          response.ok
+            ? "The simulation returned an unreadable response. Please try again."
+            : "The request could not be validated. Check the required fields and try again.",
+        );
       }
 
       if (!response.ok) {
         const apiError = SimulationApiErrorSchema.safeParse(payload);
         if (apiError.success) {
-          throw new Error(apiError.data.error.message);
+          throw new SimulationRequestError(
+            response.status === 400 || apiError.data.error.code === "INVALID_REQUEST" ? "validation" : "server",
+            apiError.data.error.message,
+          );
         }
-        throw new Error(response.status >= 500
-          ? "The simulation is temporarily unavailable. Please try again."
-          : "The request could not be validated. Check the required fields and try again.");
+        throw new SimulationRequestError(
+          response.status >= 500 ? "server" : "validation",
+          response.status >= 500
+            ? "The simulation is temporarily unavailable. Please try again."
+            : "The request could not be validated. Check the required fields and try again.",
+        );
       }
 
       const parsedReport = SimulationReportSchema.safeParse(payload);
       if (!parsedReport.success) {
-        throw new Error("The simulation returned an unexpected report. Please try again.");
+        throw new SimulationRequestError("response", "The simulation returned an unexpected report. Please try again.");
       }
 
       setReport(parsedReport.data);
       setReportedDecision(decision);
     } catch (caught: unknown) {
-      setError(caught instanceof TypeError
-        ? "Could not connect to the simulation. Check your connection and try again."
-        : caught instanceof Error
-          ? caught.message
-          : "Something went wrong. Please try again.");
+      if (caught instanceof SimulationRequestError) {
+        setError({ kind: caught.kind, message: caught.message });
+      } else if (caught instanceof TypeError) {
+        setError({
+          kind: "network",
+          message: "Could not connect to the simulation. Check your connection and try again.",
+        });
+      } else {
+        setError({
+          kind: "server",
+          message: "Something went wrong while preparing the simulation. Please try again.",
+        });
+      }
     } finally {
+      submissionInProgress.current = false;
       setLoading(false);
     }
   }
@@ -88,7 +132,7 @@ export default function SimulationApp() {
               <p>Start with the question and the two options in front of you.</p>
             </div>
           </div>
-          {error && <div className="error-panel" role="alert"><span className="error-symbol" aria-hidden="true">!</span><div><h3>We couldn’t run that yet</h3><p>{error}</p></div></div>}
+          {error && <div className="error-panel" role="alert"><span className="error-symbol" aria-hidden="true">!</span><div><h3>{ERROR_TITLES[error.kind]}</h3><p>{error.message}</p></div></div>}
           <DecisionForm loading={loading} onSubmit={submitDecision} />
         </section>
 
@@ -111,7 +155,7 @@ export default function SimulationApp() {
             <div className="empty-report">
               <div className="empty-mark" aria-hidden="true"><span /><span /></div>
               <h3>A little clarity starts here.</h3>
-              <p>Your report will appear after all four perspectives pass validation and their side-by-side synthesis is complete.</p>
+              <p>Enter your decision and submit the form to compare perspectives for both options.</p>
               <span className="empty-footnote">Exploratory scores, not predictions.</span>
             </div>
           )}

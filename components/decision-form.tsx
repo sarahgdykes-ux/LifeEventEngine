@@ -71,7 +71,7 @@ export default function DecisionForm({ loading, onSubmit }: DecisionFormProps) {
   }
 
   return (
-    <form className="decision-form" onSubmit={handleSubmit} aria-busy={loading}>
+    <form className="decision-form" onSubmit={handleSubmit} aria-busy={loading} noValidate>
       <div className="form-section">
         <label className="field-label" htmlFor="decision-question">What decision are you facing?</label>
         <input
@@ -180,7 +180,7 @@ export default function DecisionForm({ loading, onSubmit }: DecisionFormProps) {
         <p className="field-help" id="constraints-help">Sent as <code>constraints.other</code>; separate items with commas.</p>
       </div>
 
-      {validationMessage && <p className="inline-error" role="alert">{validationMessage}</p>}
+      {validationMessage && <p className="inline-error" id="decision-validation-error" role="alert">{validationMessage}</p>}
 
       <button className="submit-button" type="submit" disabled={loading}>
         {loading ? <><span className="button-spinner" aria-hidden="true" /> Exploring both paths</> : <>Explore this decision <span aria-hidden="true">→</span></>}

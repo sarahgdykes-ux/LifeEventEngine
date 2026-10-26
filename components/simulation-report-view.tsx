@@ -1,5 +1,5 @@
+import { AGENT_NAMES, OPTION_IDS, type AgentName, type OptionId } from "@/lib/agents/types";
 import type { DecisionInput } from "@/lib/schemas/decision";
-import type { AgentName } from "@/lib/agents/types";
 import type { AgentResult, OptionSynthesis, SimulationReport } from "@/lib/schemas/simulation";
 
 interface SimulationReportViewProps {
@@ -20,35 +20,15 @@ const SCORE_LABELS = {
   riskLevel: "Risk level",
 } as const;
 
-function AgentResultCard({ result }: { result: AgentResult }) {
-  return (
-    <article className="agent-result">
-      <div className="result-title-row">
-        <div><p className="result-kicker">VALIDATED PERSPECTIVE</p><h3>{AGENT_LABELS[result.agent]} <span>· Option {result.optionId}</span></h3></div>
-        <span className={`result-status result-status-${result.status}`}>{result.status}</span>
-      </div>
-      <section className="result-section">
-        <h4>Findings</h4>
-        <ul>{result.findings.map((finding, index) => <li key={`${index}-${finding}`}>{finding}</li>)}</ul>
-      </section>
-      <div className="result-detail-grid">
-        <section className="result-section">
-          <h4>Assumptions</h4>
-          <ul>{result.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
-        </section>
-        <section className="result-section">
-          <h4>Uncertainties</h4>
-          <ul>{result.uncertainties.map((uncertainty, index) => <li key={`${index}-${uncertainty}`}>{uncertainty}</li>)}</ul>
-        </section>
-      </div>
-      <p className="confidence-note">Self-reported confidence: <strong>{result.confidence}%</strong></p>
-    </article>
-  );
-}
+const HORIZONS = [
+  ["year1", "Year 1"],
+  ["year5", "Year 5"],
+  ["year10", "Year 10"],
+] as const;
 
 function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
   return (
-    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} breakdown scores`}>
+    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} overview scores`}>
       {Object.entries(synthesis.breakdownScores).map(([name, score]) => (
         <article className="score-card" key={name}>
           <div><h4>{SCORE_LABELS[name as keyof typeof SCORE_LABELS]}</h4><strong>{score.value}<span>/100</span></strong></div>
@@ -59,63 +39,164 @@ function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
   );
 }
 
-function OptionSynthesis({ synthesis, label }: { synthesis: OptionSynthesis; label: string }) {
+function AgentResultCard({ result }: { result: AgentResult }) {
   return (
-    <article className="option-synthesis">
-      <h3><span className={`option-marker option-marker-${synthesis.optionId.toLowerCase()}`}>{synthesis.optionId}</span>{label}</h3>
-      <BreakdownScores synthesis={synthesis} />
-      <div className="synthesis-timeline">
-        {(["year1", "year5", "year10"] as const).map((horizon) => (
-          <section className="synthesis-horizon" key={horizon}>
-            <h4>{horizon === "year1" ? "1 year" : horizon === "year5" ? "5 years" : "10 years"}</h4>
-            <ul>
-              {synthesis.timeline[horizon].map(({ agent, projection }) => (
-                <li key={agent}><strong>{AGENT_LABELS[agent]}</strong><p>{projection}</p></li>
-              ))}
-            </ul>
-          </section>
-        ))}
+    <article className={`agent-result${result.status === "complete" ? "" : " agent-result-incomplete"}`}>
+      <div className="result-title-row">
+        <div>
+          <p className="result-kicker">SPECIALIST PERSPECTIVE</p>
+          <h4>{AGENT_LABELS[result.agent]}</h4>
+        </div>
+        <span className={`result-status result-status-${result.status}`}>{result.status}</span>
       </div>
+      {result.status !== "complete" && (
+        <p className="result-incomplete-note">
+          This perspective is marked {result.status} and is not counted as a complete result.
+        </p>
+      )}
+      <section className="result-section">
+        <h5>Findings</h5>
+        <ul>{result.findings.map((finding, index) => <li key={`${index}-${finding}`}>{finding}</li>)}</ul>
+      </section>
+      <div className="result-detail-grid">
+        <section className="result-section">
+          <h5>Assumptions</h5>
+          <ul>{result.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}</ul>
+        </section>
+        <section className="result-section">
+          <h5>Uncertainties</h5>
+          <ul>{result.uncertainties.map((uncertainty, index) => <li key={`${index}-${uncertainty}`}>{uncertainty}</li>)}</ul>
+        </section>
+      </div>
+      <p className="confidence-note">
+        Self-reported confidence: <strong>{result.confidence}%</strong>
+        <span> This is an analysis rating, not a probability of an outcome.</span>
+      </p>
+      <section className="projections" aria-label={`${AGENT_LABELS[result.agent]} illustrative projections`}>
+        <h5>Illustrative scenarios · not predictions</h5>
+        <div className="projection-grid">
+          {HORIZONS.map(([key, label]) => (
+            <section key={key}>
+              <span>{label}</span>
+              <p>{result.projections[key]}</p>
+            </section>
+          ))}
+        </div>
+      </section>
     </article>
   );
 }
 
+function MissingResultCard({ agent, optionId }: { agent: AgentName; optionId: OptionId }) {
+  return (
+    <article className="missing-result-card">
+      <h4>{AGENT_LABELS[agent]}</h4>
+      <p>No validated result was returned for this agent and option. No perspective has been substituted.</p>
+      <code>{agent}:{optionId}</code>
+    </article>
+  );
+}
+
+function OptionPerspective({
+  option,
+  results,
+}: {
+  option: DecisionInput["options"][number];
+  results: SimulationReport["results"];
+}) {
+  return (
+    <section className={`option-perspective option-perspective-${option.id.toLowerCase()}`} aria-labelledby={`option-${option.id}-results`}>
+      <h3 id={`option-${option.id}-results`}>
+        <span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span>
+        <span>{option.label}</span>
+      </h3>
+      {option.description && <p className="option-perspective-description">{option.description}</p>}
+      <div className="option-agent-results">
+        {AGENT_NAMES.map((agent) => {
+          const result = results.find((candidate) => candidate.agent === agent && candidate.optionId === option.id);
+          return result
+            ? <AgentResultCard key={agent} result={result} />
+            : <MissingResultCard key={agent} agent={agent} optionId={option.id} />;
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function SimulationReportView({ report, decision }: SimulationReportViewProps) {
+  const missingResultDetails = report.missingResults.map((key) => {
+    const [agentKey, optionKey] = key.split(":");
+    const agent = AGENT_NAMES.find((candidate) => candidate === agentKey);
+    const optionId = OPTION_IDS.find((candidate) => candidate === optionKey);
+    if (!agent || !optionId) return null;
+    const result = report.results.find((candidate) => candidate.agent === agent && candidate.optionId === optionId);
+    return { key, agent, optionId, status: result?.status };
+  }).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
   return (
     <div className="report-content">
-      <div className={`report-status report-status-${report.reportStatus}`}>
+      <div className={`report-status report-status-${report.reportStatus}`} role="status">
         <span className="report-status-indicator" aria-hidden="true" />
-        {report.reportStatus === "partial" ? "Partial report" : report.reportStatus === "complete" ? "Complete report" : "Report unavailable"}
+        {report.reportStatus === "partial" ? "Partial report" : report.reportStatus === "complete" ? "Complete report" : "Report failed"}
       </div>
       <h2 className="report-question">{decision.question}</h2>
-      <div className="report-options" aria-label="Options in this decision">
-        {decision.options.map((option) => <p key={option.id}><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span><span><strong>{option.label}</strong>{option.description && <small>{option.description}</small>}</span></p>)}
-      </div>
-      {report.synthesis ? (
-        <>
-          <h3 className="synthesis-heading">Side-by-side possible futures</h3>
-          <p className="score-explanation">Scores use a 0–100 scale, where higher risk means greater downside exposure. Current neutral scores are placeholders because the simulator does not yet collect personal financial or wellbeing baselines; they are not measured predictions or advice.</p>
-          <div className="synthesis-options">
-            {report.synthesis.options.map((optionSynthesis) => {
-              const option = decision.options.find(({ id }) => id === optionSynthesis.optionId);
-              return option && <OptionSynthesis key={option.id} synthesis={optionSynthesis} label={option.label} />;
+      {report.reportStatus === "partial" && (
+        <p className="report-status-explanation">
+          Some specialist results are missing or incomplete. The perspectives shown below were returned, but this report is not a complete comparison.
+        </p>
+      )}
+      {report.reportStatus === "failed" && (
+        <p className="report-status-explanation">
+          No specialist returned a complete result. Any returned details are shown below; missing perspectives have not been filled in.
+        </p>
+      )}
+
+      {report.synthesis && (
+        <section className="report-overview" aria-labelledby="report-overview-heading">
+          <h3 id="report-overview-heading">At-a-glance comparison</h3>
+          <p className="score-explanation">Scores are neutral placeholders for discussion, not measured predictions or advice. Higher risk means greater downside exposure.</p>
+          <div className="overview-options">
+            {report.synthesis.options.map((synthesis) => {
+              const option = decision.options.find(({ id }) => id === synthesis.optionId);
+              return option && (
+                <section className="overview-option" key={option.id} aria-label={`Option ${option.id}: ${option.label}`}>
+                  <h4><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span>{option.label}</h4>
+                  <BreakdownScores synthesis={synthesis} />
+                </section>
+              );
             })}
           </div>
-        </>
-      ) : (
-        <section className="report-unavailable">
-          <h3>Side-by-side summary unavailable</h3>
-          <p>The specialist set did not complete, so no synthesized summary was produced.</p>
-          {report.missingResults.length > 0 && <p>Incomplete results: {report.missingResults.join(", ")}</p>}
         </section>
       )}
-      <details className="raw-agent-results">
-        <summary>Inspect individual agent outputs</summary>
-        <div className="result-list">
-          {report.results.map((result) => <AgentResultCard key={`${result.agent}:${result.optionId}`} result={result} />)}
+
+      {missingResultDetails.length > 0 && (
+        <section className="missing-notice" aria-labelledby="missing-results-heading">
+          <h3 id="missing-results-heading">Missing or incomplete results</h3>
+          <p>These agent-option results are not complete. No substitute content was created.</p>
+          <ul>
+            {missingResultDetails.map(({ key, agent, optionId, status }) => (
+              <li key={key}>
+                <span>{AGENT_LABELS[agent]} · Option {optionId}</span>
+                <code>{status ? `${status} · ${key}` : `not returned · ${key}`}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="perspectives-section" aria-labelledby="perspectives-heading">
+        <div className="perspectives-heading">
+          <h3 id="perspectives-heading">Perspectives by option</h3>
+          <p>Each agent’s assumptions, uncertainties, and time horizons are shown separately. Projections are illustrative scenarios, not guaranteed outcomes.</p>
         </div>
-      </details>
-      <p className="report-disclaimer">These illustrative scenarios are prompts for reflection, not predictions or recommendations.</p>
+        <div className="option-perspective-grid">
+          {decision.options.map((option) => (
+            <OptionPerspective key={option.id} option={option} results={report.results} />
+          ))}
+        </div>
+      </section>
+
+      <p className="report-disclaimer">Use these perspectives as prompts for reflection, not as predictions or recommendations.</p>
     </div>
   );
 }
