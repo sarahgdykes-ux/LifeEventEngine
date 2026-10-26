@@ -30,6 +30,28 @@ describe("shared runtime validation", () => {
     expect(duplicateOptions.success).toBe(false);
   });
 
+  it("rejects oversized decision text and lists", () => {
+    expect(validateDecisionInput({
+      ...sampleDecision,
+      question: "q".repeat(1_001),
+    }).success).toBe(false);
+    expect(validateDecisionInput({
+      ...sampleDecision,
+      options: [
+        { ...sampleDecision.options[0], label: "a".repeat(201) },
+        sampleDecision.options[1],
+      ],
+    }).success).toBe(false);
+    expect(validateDecisionInput({
+      ...sampleDecision,
+      goals: Array.from({ length: 21 }, (_, index) => `goal ${index}`),
+    }).success).toBe(false);
+    expect(validateDecisionInput({
+      ...sampleDecision,
+      constraints: { other: ["c".repeat(201)] },
+    }).success).toBe(false);
+  });
+
   it("rejects malformed agent output and invalid enum/range values", () => {
     expect(() => validateAgentResults([{ ...validResult, agent: "narrator" }])).toThrow();
     expect(() => validateAgentResults([{ ...validResult, confidence: 101 }])).toThrow();

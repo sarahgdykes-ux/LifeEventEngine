@@ -60,23 +60,29 @@ export default function SimulationApp() {
           response.ok ? "response" : "validation",
           response.ok
             ? "The simulation returned an unreadable response. Please try again."
-            : "The request could not be validated. Check the required fields and try again.",
+            : "The request could not be validated. Check required fields and keep text within the documented limits.",
         );
       }
 
       if (!response.ok) {
         const apiError = SimulationApiErrorSchema.safeParse(payload);
+        if (response.status === 413) {
+          throw new SimulationRequestError(
+            "validation",
+            "Decision details exceed the request size limit. Shorten the text or remove list items and try again.",
+          );
+        }
         if (response.status === 400 || (apiError.success && apiError.data.error.code === "INVALID_REQUEST")) {
           throw new SimulationRequestError(
             "validation",
-            "The request could not be validated. Check the required fields and try again.",
+            "The request could not be validated. Check required fields and keep text within the documented limits.",
           );
         }
         throw new SimulationRequestError(
           response.status >= 500 ? "server" : "validation",
           response.status >= 500
             ? "The simulation is temporarily unavailable. Please try again."
-            : "The request could not be validated. Check the required fields and try again.",
+            : "The request could not be validated. Check required fields and keep text within the documented limits.",
         );
       }
 

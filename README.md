@@ -16,6 +16,8 @@ import type { SimulationApiError } from "@/lib/schemas/api";
 
 The request requires a non-empty question, exactly two options with IDs `A` and `B`, and non-empty goals and priorities. Option descriptions are optional. The canonical constraints form is an object with an `other` list; the Day 1 Part 1 `string[]` form remains accepted for compatibility.
 
+Server validation limits the request body to 32 KiB, questions and option descriptions to 1,000 characters, option labels to 200 characters, and each goal, priority, or constraint item to 200 characters with at most 20 items in each list.
+
 ### Example Request
 
 ```json

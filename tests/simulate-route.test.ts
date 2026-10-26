@@ -58,6 +58,24 @@ describe("POST /api/simulate", () => {
     simulation.mockRestore();
   });
 
+  it("does not return an invalid report from the orchestration boundary", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const simulation = vi.spyOn(orchestrator, "runSimulation").mockResolvedValueOnce({} as never);
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sampleDecision),
+    }));
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({
+      error: { code: "INTERNAL_ERROR", message: "Simulation could not be completed." },
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.question);
+    simulation.mockRestore();
+    log.mockRestore();
+  });
+
   it.each([
     ["missing question", { ...sampleDecision, question: "" }],
     ["missing option", { ...sampleDecision, options: [sampleDecision.options[0]] }],
@@ -86,6 +104,19 @@ describe("POST /api/simulate", () => {
     expect(malformedJsonResponse.status).toBe(400);
     expect(await malformedJsonResponse.json()).toEqual({
       error: { code: "INVALID_REQUEST", message: "Request body must be valid JSON." },
+    });
+  });
+
+  it("rejects request bodies larger than the server limit before parsing", async () => {
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: " ".repeat(32 * 1024 + 1),
+    }));
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({
+      error: { code: "INVALID_REQUEST", message: "Request body exceeds the 32 KB limit." },
     });
   });
 

@@ -151,6 +151,23 @@ describe("SimulationApp", () => {
       .toBe(sampleDecision.question);
   });
 
+  it("explains when the request exceeds the server size limit", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      error: { code: "INVALID_REQUEST", message: "Request body exceeds the 32 KB limit." },
+    }, 413)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+
+    expect(await screen.findByText(
+      "Decision details exceed the request size limit. Shorten the text or remove list items and try again.",
+    )).toBeTruthy();
+    expect(screen.queryByText("Request body exceeds the 32 KB limit.")).toBeNull();
+    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
+      .toBe(sampleDecision.question);
+  });
+
   it("does not expose server error details or stack traces", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
       error: {

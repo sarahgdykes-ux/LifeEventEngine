@@ -2,17 +2,21 @@ import { z } from "zod";
 import { OptionIdSchema } from "@/lib/agents/types";
 
 const RequiredTextSchema = z.string().trim().min(1, "Must not be empty");
-const TextListSchema = z.array(RequiredTextSchema);
+const QuestionSchema = RequiredTextSchema.max(1_000);
+const OptionLabelSchema = RequiredTextSchema.max(200);
+const OptionDescriptionSchema = RequiredTextSchema.max(1_000);
+const ListItemSchema = RequiredTextSchema.max(200);
+const TextListSchema = z.array(ListItemSchema).max(20);
 const NonEmptyTextListSchema = TextListSchema.min(1, "Must contain at least one item");
 
 export const DecisionOptionSchema = z.object({
   id: OptionIdSchema,
-  label: RequiredTextSchema,
-  description: RequiredTextSchema.optional(),
+  label: OptionLabelSchema,
+  description: OptionDescriptionSchema.optional(),
 });
 
 export const DecisionInputSchema = z.object({
-  question: RequiredTextSchema,
+  question: QuestionSchema,
   options: z
     .tuple([DecisionOptionSchema, DecisionOptionSchema])
     .refine(([first, second]) => first.id !== second.id, {
