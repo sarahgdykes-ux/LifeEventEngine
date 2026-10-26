@@ -1,33 +1,38 @@
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
+import { describeDecisionContext } from "@/lib/agents/context";
 
 export class FinancialAgent implements SpecialistAgent {
   readonly name = "financial" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    const context = describeDecisionContext(decision, option);
+
     return {
       agent: this.name,
       optionId: option.id,
       findings: [
-        `Financial review prompt: compare expected income, one-time costs, recurring expenses, debt, and savings for ${option.label.toLowerCase()}.`,
+        `For "${context.question}", make a side-by-side budget for ${context.option} that includes income changes, one-time costs, recurring expenses, debt, and savings before judging its fit with ${context.goals}.`,
+        `Check whether the budget protects the priority of ${context.priorities} while staying within the constraint(s): ${context.constraints}.`,
       ],
       assumptions: [
-        "No income, expense, debt, savings, or location-specific cost data was supplied, so this is not a fiscal projection.",
+        `No personal income, expense, debt, savings, or location-specific cost figures were supplied for ${context.option}; these prompts are illustrative and do not establish a financial outcome.`,
       ],
-      confidence: 25,
+      confidence: 30,
       uncertainties: [
-        `The financial effect of ${option.label.toLowerCase()} depends on actual costs, income changes, and the user's available resources.`,
+        `The financial effect of ${context.option} depends on actual costs, income changes, available resources, and any omitted costs associated with the stated constraints (${context.constraints}).`,
+        `The prompt does not say what financial trade-offs the user would accept to pursue ${context.goals}.`,
       ],
       projections: {
-        year1: `Financial checkpoint: list transition costs and build a month-by-month budget for ${option.label.toLowerCase()} before committing.`,
-        year5: `Financial checkpoint: review income growth, recurring costs, debt repayment, and savings against the original plan.`,
-        year10: `Financial checkpoint: compare accumulated savings and obligations with alternatives; no long-range amount can be inferred from this prompt.`,
+        year1: `Illustrative checkpoint, not a forecast: list transition costs for ${context.option} and compare monthly income and expenses with the constraint(s) ${context.constraints}.`,
+        year5: `Illustrative checkpoint, not a forecast: compare actual income, recurring costs, debt, and savings with the budget and the goal of ${context.goals}.`,
+        year10: `Illustrative checkpoint, not a forecast: reassess savings, obligations, and flexibility against the priority of ${context.priorities}; no future amount can be inferred here.`,
       },
       scores: {
         financialHealth: {
           value: 50,
-          rationale: "Neutral baseline only: no personal financial figures were supplied to estimate cash flow, debt-to-income, or wealth changes.",
+          rationale: "Neutral placeholder only, not a forecast: no personal financial figures were supplied to estimate cash flow, affordability, or future wealth.",
         },
       },
       status: "complete",

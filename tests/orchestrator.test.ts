@@ -69,7 +69,7 @@ describe("runSimulation", () => {
     const narrate = vi.spyOn(narrator, "synthesize");
 
     await expect(runSimulation(sampleDecision, customAgents)).rejects.toThrow(
-      "Narrator requires one valid result from every specialist for both options",
+      "Simulation aborted because one or more specialist results failed validation or analysis",
     );
     expect(narrate).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
@@ -78,6 +78,33 @@ describe("runSimulation", () => {
       schemaValid: false,
     });
     expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.question);
+    narrate.mockRestore();
+    log.mockRestore();
+  });
+
+  it("aborts and logs when a specialist throws", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const customAgents = SPECIALIST_AGENTS.map((agent) => ({
+      ...agent,
+      analyze: vi.fn(async (decision, option) => {
+        if (agent.name === "pessimist" && option.id === "A") {
+          throw new Error("analysis failed");
+        }
+        return agent.analyze(decision, option);
+      }),
+    }));
+    const narrate = vi.spyOn(narrator, "synthesize");
+
+    await expect(runSimulation(sampleDecision, customAgents)).rejects.toThrow(
+      "Simulation aborted because one or more specialist results failed validation or analysis",
+    );
+    expect(narrate).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
+      key: "pessimist:A",
+      failureType: "agent_error",
+      schemaValid: false,
+    });
+    expect(JSON.stringify(log.mock.calls)).not.toContain("analysis failed");
     narrate.mockRestore();
     log.mockRestore();
   });

@@ -51,6 +51,9 @@ export async function runSimulation(
       return undefined;
     }
   })));
+  if (candidates.some((result) => result === undefined)) {
+    throw new Error("Simulation aborted because one or more specialist results failed validation or analysis");
+  }
   const usableResults = candidates.filter((result): result is AgentResult => result !== undefined);
   const completeResults = validateCompleteAgentHandoff(usableResults);
   console.info("Simulation narrator handoff started", {

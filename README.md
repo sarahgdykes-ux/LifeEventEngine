@@ -43,7 +43,7 @@ The request requires a non-empty question, exactly two options with IDs `A` and 
 
 A successful response contains eight validated specialist results (four agents for each option), a Narrator synthesis with side-by-side 1-, 5-, and 10-year perspectives, and per-option breakdown scores. The Narrator is not called unless every agent-option result passes schema validation. If any specialist fails or returns invalid output, the request fails with a safe internal error rather than returning a partial or synthesized report.
 
-The individual `results` are retained in the response for inspection. Server audit logs contain only agent names, option IDs, schema-validation status, and failure type; user decision text and raw agent output are never written to logs.
+The individual `results` are retained in the response for inspection. Specialist templates use the submitted question, goals, priorities, constraints, and option descriptions to frame distinct risk, financial, and wellbeing considerations. Projections are illustrative prompts, not verified facts or reliable predictions; confidence is a self-reported analysis rating, not a calibrated probability. Server audit logs contain only agent names, option IDs, schema-validation status, and failure type; user decision text and raw agent output are never written to logs.
 
 Breakdown scores use a 0–100 scale. In this template-only implementation, Financial Health, Emotional Wellbeing, and Risk Level use a neutral score of 50 with an explanation because the app does not collect enough financial figures or wellbeing baselines to produce a meaningful estimate. Higher Risk Level means greater downside exposure. These scores are placeholders, not factual predictions or advice.
 
@@ -96,4 +96,4 @@ This should return HTTP 400 with code `INVALID_REQUEST`.
 
 ## Current Limitations
 
-All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Breakdown scores are neutral placeholders until a grounded scoring method and appropriate personal baselines are defined. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.
+All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Breakdown scores are neutral placeholders, not forecasts, until a grounded scoring method and appropriate personal baselines are defined. Invalid specialist output or a thrown specialist error aborts simulation rather than creating a successful placeholder result. The form resets on refresh. UI interaction tests are not configured yet; use the manual browser smoke test above after starting the development server.
