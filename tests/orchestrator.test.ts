@@ -24,6 +24,8 @@ describe("runSimulation", () => {
       "wellbeing:A",
       "wellbeing:B",
     ]);
+    expect(report.results.every((result) => result.status === "complete")).toBe(true);
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
     expect(report.missingResults).toEqual([]);
     if (!report.synthesis) throw new Error("Expected complete report synthesis");
     expect(report.synthesis.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
@@ -72,6 +74,8 @@ describe("runSimulation", () => {
     expect(report.reportStatus).toBe("partial");
     expect(report.missingResults).toEqual(["financial:A"]);
     expect(report.results).toHaveLength(7);
+    expect(report.results.map(({ agent, optionId }) => `${agent}:${optionId}`)).not.toContain("financial:A");
+    expect(report.results.some(({ agent, optionId }) => agent === "financial" && optionId === "B")).toBe(true);
     expect(report.synthesis).toBeNull();
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
     expect(narrate).not.toHaveBeenCalled();
@@ -89,6 +93,12 @@ describe("runSimulation", () => {
 
     expect(report.reportStatus).toBe("partial");
     expect(report.results).toHaveLength(4);
+    expect(report.results.map(({ agent, optionId }) => `${agent}:${optionId}`).sort()).toEqual([
+      "pessimist:A",
+      "pessimist:B",
+      "wellbeing:A",
+      "wellbeing:B",
+    ]);
     expect(report.missingResults).toEqual([
       "optimist:A",
       "optimist:B",
@@ -99,6 +109,34 @@ describe("runSimulation", () => {
     expect(log).toHaveBeenCalledWith("Simulation duplicate agent results rejected", {
       key: "optimist:A",
       duplicateCount: 2,
+    });
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    log.mockRestore();
+  });
+
+  it("does not let a mismatched result invalidate the requested specialist's valid result", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const pessimist = SPECIALIST_AGENTS.find(({ name }) => name === "pessimist");
+    if (!pessimist) throw new Error("Expected a registered Pessimist agent");
+    const customAgents = SPECIALIST_AGENTS.map((agent) => ({
+      ...agent,
+      analyze: vi.fn(async (decision, option) => {
+        return agent.name === "optimist" && option.id === "A"
+          ? pessimist.analyze(decision, option)
+          : agent.analyze(decision, option);
+      }),
+    }));
+
+    const report = await runSimulation(sampleDecision, customAgents);
+
+    expect(report.reportStatus).toBe("partial");
+    expect(report.missingResults).toEqual(["optimist:A"]);
+    expect(report.results.some(({ agent, optionId }) => agent === "pessimist" && optionId === "A")).toBe(true);
+    expect(report.results).toHaveLength(7);
+    expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
+      key: "optimist:A",
+      failureType: "key_mismatch",
+      schemaValid: true,
     });
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
     log.mockRestore();
@@ -122,6 +160,7 @@ describe("runSimulation", () => {
     expect(report.reportStatus).toBe("partial");
     expect(report.missingResults).toEqual(["financial:A"]);
     expect(report.results).toHaveLength(7);
+    expect(report.results.some(({ agent, optionId }) => agent === "financial" && optionId === "B")).toBe(true);
     expect(report.synthesis).toBeNull();
     expect(narrate).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
@@ -152,6 +191,7 @@ describe("runSimulation", () => {
     expect(report.reportStatus).toBe("partial");
     expect(report.missingResults).toEqual(["pessimist:A"]);
     expect(report.results).toHaveLength(7);
+    expect(report.results.some(({ agent, optionId }) => agent === "pessimist" && optionId === "B")).toBe(true);
     expect(report.synthesis).toBeNull();
     expect(narrate).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith("Simulation agent result rejected", {
@@ -180,6 +220,14 @@ describe("runSimulation", () => {
     expect(report.reportStatus).toBe("partial");
     expect(report.missingResults).toEqual(["financial:A", "wellbeing:B"]);
     expect(report.results).toHaveLength(6);
+    expect(report.results.map(({ agent, optionId }) => `${agent}:${optionId}`).sort()).toEqual([
+      "financial:B",
+      "optimist:A",
+      "optimist:B",
+      "pessimist:A",
+      "pessimist:B",
+      "wellbeing:A",
+    ]);
     expect(report.synthesis).toBeNull();
     expect(JSON.stringify(log.mock.calls)).not.toContain("private worker detail");
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);

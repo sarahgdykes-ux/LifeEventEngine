@@ -66,10 +66,10 @@ export default function SimulationApp() {
 
       if (!response.ok) {
         const apiError = SimulationApiErrorSchema.safeParse(payload);
-        if (apiError.success) {
+        if (response.status === 400 || (apiError.success && apiError.data.error.code === "INVALID_REQUEST")) {
           throw new SimulationRequestError(
-            response.status === 400 || apiError.data.error.code === "INVALID_REQUEST" ? "validation" : "server",
-            apiError.data.error.message,
+            "validation",
+            "The request could not be validated. Check the required fields and try again.",
           );
         }
         throw new SimulationRequestError(

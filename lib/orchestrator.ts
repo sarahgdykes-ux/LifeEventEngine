@@ -77,7 +77,7 @@ export async function runSimulation(
 
   const attemptsByResultKey = new Map<string, AgentAttempt[]>();
   candidates.forEach((attempt) => {
-    if (!attempt.result) return;
+    if (!attempt.result || !attempt.matchesRequestedKey) return;
     const resultKey = `${attempt.result.agent}:${attempt.result.optionId}`;
     const attempts = attemptsByResultKey.get(resultKey) ?? [];
     attempts.push(attempt);

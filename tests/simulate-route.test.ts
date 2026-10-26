@@ -89,6 +89,7 @@ describe("POST /api/simulate", () => {
   });
 
   it("returns a safe 500 when simulation execution fails", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const failure = vi.spyOn(orchestrator, "runSimulation").mockRejectedValueOnce(new Error("private detail"));
     const response = await POST(new Request("http://localhost/api/simulate", {
       method: "POST",
@@ -102,6 +103,8 @@ describe("POST /api/simulate", () => {
       error: { code: "INTERNAL_ERROR", message: "Simulation could not be completed." },
     });
     expect(JSON.stringify(body)).not.toContain("private detail");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private detail");
     failure.mockRestore();
+    log.mockRestore();
   });
 });

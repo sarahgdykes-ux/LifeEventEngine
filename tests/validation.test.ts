@@ -56,4 +56,32 @@ describe("shared runtime validation", () => {
       missingResults: ["optimist:A"],
     })).toThrow(/missingResults must list every absent agent-option result/);
   });
+
+  it("never accepts a complete report with a missing, partial, or fabricated result", async () => {
+    const report = await runSimulation(sampleDecision);
+    const withoutFinancialA = report.results.filter(
+      ({ agent, optionId }) => agent !== "financial" || optionId !== "A",
+    );
+    const partialFinancialA = report.results.map((result) =>
+      result.agent === "financial" && result.optionId === "A"
+        ? { ...result, status: "partial" as const }
+        : result,
+    );
+
+    expect(() => validateSimulationReport({
+      ...report,
+      results: withoutFinancialA,
+      missingResults: [],
+    })).toThrow();
+    expect(() => validateSimulationReport({
+      ...report,
+      results: partialFinancialA,
+      missingResults: [],
+    })).toThrow();
+    expect(() => validateSimulationReport({
+      ...report,
+      results: withoutFinancialA,
+      missingResults: ["financial:A"],
+    })).toThrow();
+  });
 });
