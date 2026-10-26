@@ -120,13 +120,13 @@ export default function SimulationApp() {
           <span className="wordmark-mark" aria-hidden="true">L</span>
           <span>Life Decision<br />Simulator</span>
         </a>
-        <span className="topbar-note"><span className="status-dot" /> Day 1 · Decision exploration</span>
+        <span className="topbar-note"><span className="status-dot" /> Prototype · decision exploration</span>
       </header>
 
       <section className="intro" aria-labelledby="page-title">
         <p className="eyebrow">MAKE SPACE FOR WHAT MATTERS</p>
         <h1 id="page-title">See both paths<br className="desktop-break" /> more clearly.</h1>
-        <p className="intro-copy">Bring a real decision, name what matters to you, and explore the possibilities one step at a time.</p>
+        <p className="intro-copy">Explore possible outcomes from two paths, using your goals and priorities as context. This prototype offers reflection prompts—not predictions or recommendations.</p>
       </section>
 
       <div className="workspace">
@@ -153,7 +153,7 @@ export default function SimulationApp() {
           {loading ? (
             <div className="loading-panel" role="status">
               <span className="loading-spinner" aria-hidden="true" />
-              <div><h3>Considering both options</h3><p>Four perspectives are being prepared in parallel. This can take a moment.</p></div>
+              <div><h3>Preparing both perspectives</h3><p>Eight specialist analyses are being prepared. This can take a moment; the scenarios are illustrative, not predictions.</p></div>
             </div>
           ) : report && reportedDecision ? (
             <SimulationReportView report={report} decision={reportedDecision} />
@@ -168,7 +168,7 @@ export default function SimulationApp() {
         </section>
       </div>
 
-      <footer className="page-footer"><span>Thoughtful decisions take time.</span><span>Explore possibilities, not predictions.</span></footer>
+      <footer className="page-footer"><span>For reflection, not decision advice.</span><span>Explore possibilities—not predictions.</span></footer>
     </main>
   );
 }

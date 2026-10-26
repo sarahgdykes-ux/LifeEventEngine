@@ -128,7 +128,7 @@ function AgentResultCard({ result }: { result: AgentResult }) {
         <span> This is an analysis rating, not a probability of an outcome.</span>
       </p>
       <section className="projections" aria-label={`${AGENT_LABELS[result.agent]} illustrative projections`}>
-        <h5>Illustrative scenarios · not predictions</h5>
+        <h5>Illustrative projections · not predictions</h5>
         <div className="projection-grid">
           {HORIZONS.map(([key, label]) => (
             <section key={key}>
@@ -198,6 +198,11 @@ export default function SimulationReportView({ report, decision }: SimulationRep
       {report.reportStatus === "partial" && (
         <p className="report-status-explanation">
           Some specialist results are missing or incomplete. The perspectives shown below were returned, but this report is not a complete comparison.
+        </p>
+      )}
+      {report.reportStatus === "complete" && (
+        <p className="report-status-explanation report-status-complete-explanation">
+          All eight specialist results passed validation. “Complete” describes coverage only; these illustrative perspectives are not verified facts, predictions, or recommendations.
         </p>
       )}
       {report.reportStatus === "failed" && (

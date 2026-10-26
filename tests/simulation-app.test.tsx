@@ -102,12 +102,14 @@ describe("SimulationApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
 
     expect(await screen.findByText("Complete report")).toBeTruthy();
+    expect(screen.getByText(/All eight specialist results passed validation/)).toBeTruthy();
     expect(screen.getAllByText("SPECIALIST PERSPECTIVE")).toHaveLength(8);
     expect(screen.getAllByText("Key findings by perspective")).toHaveLength(2);
     expect(screen.getAllByText("Trade-offs to consider")).toHaveLength(2);
     expect(screen.getAllByText("Direct disagreements")).toHaveLength(2);
     expect(screen.getAllByText(/No direct contradiction was identified/)).toHaveLength(2);
     expect(screen.getAllByText(/Each excerpt is quoted from/)).toHaveLength(2);
+    expect(screen.getAllByText("Illustrative projections · not predictions")).toHaveLength(8);
   });
 
   it("renders both sides of a source-backed disagreement", async () => {
@@ -185,6 +187,7 @@ describe("SimulationApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
     const submitButton = screen.getByRole("button", { name: /Exploring both paths/ }) as HTMLButtonElement;
     expect(submitButton.disabled).toBe(true);
+    expect(screen.getByText(/Eight specialist analyses are being prepared/)).toBeTruthy();
     fireEvent.submit(document.querySelector("form")!);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 

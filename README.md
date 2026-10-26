@@ -1,101 +1,123 @@
 # Life Decision Simulator
 
-A multi-agent life simulation engine that coordinates autonomous domain agents to simulate real-time career, financial, and personal growth events for an avatar.
+A small prototype for people exploring a consequential personal decision with two possible paths. It organizes reflection around a user's question, goals, priorities, and constraints. It does **not** predict what will happen, verify claims, or recommend a choice.
 
-## Simulation API
+## What the prototype does
 
-`POST /api/simulate` accepts the shared `DecisionInput` contract and returns a shared `SimulationReport`.
+For each option, four deterministic specialist templates produce a perspective:
 
-In this single Next.js app, frontend code should import the existing definitions rather than copy them:
+- **Optimist** raises possible opportunities.
+- **Pessimist** considers downside risks and fallback questions.
+- **Financial** suggests budget and affordability checks.
+- **Wellbeing** raises day-to-day, relationship, and routine considerations.
 
-```ts
-import type { DecisionInput } from "@/lib/schemas/decision";
-import type { SimulationReport } from "@/lib/schemas/simulation";
-import type { SimulationApiError } from "@/lib/schemas/api";
-```
+The **Narrator** compares the specialist findings, preserves their attribution, and calls out exact shared findings or a narrow class of direct contradictions. It does not replace the specialist perspectives. A complete report means only that all eight agent-option results were returned and validated; it does not mean the analysis is fact-checked or certain.
 
-The request requires a non-empty question, exactly two options with IDs `A` and `B`, and non-empty goals and priorities. Option descriptions are optional. The canonical constraints form is an object with an `other` list; the Day 1 Part 1 `string[]` form remains accepted for compatibility.
+### Workflow
 
-Server validation limits the request body to 32 KiB, questions and option descriptions to 1,000 characters, option labels to 200 characters, and each goal, priority, or constraint item to 200 characters with at most 20 items in each list.
+1. Enter a decision question, two options, goals, priorities, and optional constraints.
+2. The server validates the request and runs each of the four specialists for both options (eight results total).
+3. The Narrator runs only if all eight results are present, unique, valid, and complete.
+4. The UI shows the summary and source perspectives, including findings, assumptions, uncertainties, and illustrative projections. If results are missing or invalid, the UI identifies the gaps and does not show a synthesized comparison.
 
-### Example Request
+## Technology
 
-```json
-{
-	"question": "Should I go to graduate school or move to a new city?",
-	"options": [
-		{
-			"id": "A",
-			"label": "Graduate school",
-			"description": "Pursue an advanced degree."
-		},
-		{
-			"id": "B",
-			"label": "Move to a new city",
-			"description": "Relocate for new opportunities."
-		}
-	],
-	"goals": ["career growth", "personal fulfillment"],
-	"priorities": ["financial security", "wellbeing"],
-	"constraints": { "other": ["limited time"] }
-}
-```
+- Next.js 16 App Router and route handlers
+- React 19 and TypeScript
+- Zod runtime schemas for requests, results, and reports
+- Vitest and Testing Library for automated tests
+- CSS in `app/globals.css`
 
-### Simulation report
+There is no live AI provider integration, database, or authentication in this MVP. The specialist outputs are deterministic templates.
 
-A complete response contains eight validated specialist results (four agents for each option), a Narrator synthesis with attributed key findings, evidence grouped across financial, wellbeing, opportunity, and risk perspectives, user-centered trade-off questions, cautious agreement/disagreement notes, side-by-side 1-, 5-, and 10-year perspectives, and per-option breakdown scores. The synthesis retains the original question, goals, priorities, constraints, and option descriptions. The Narrator is called only when every expected agent-option result is unique, valid, and complete. If a specialist fails, returns invalid output, or produces a duplicate key, the API returns a validated `partial` or `failed` report with the available valid results, `synthesis: null`, and stable missing-result keys such as `financial:A`. A report is `failed` when it contains no complete specialist results and `partial` when it contains at least one but fewer than eight.
+## Prerequisites and setup
 
-The individual `results` are retained unchanged in the response for inspection; assumptions, uncertainties, confidence values, scores, and projections remain attached to their source specialist. Narrator excerpts are copied from those findings and are checked against the source results. Shared findings require identical text; direct disagreements are reported only for closely matching text with opposite negation. Different emphases are not presented as contradictions. Specialist templates use the submitted question, goals, priorities, constraints, and option descriptions to frame distinct risk, financial, and wellbeing considerations. Projections are illustrative prompts, not verified facts or reliable predictions; confidence is a self-reported analysis rating, not a calibrated probability. Server audit logs contain only agent names, option IDs, schema-validation status, and failure type; user decision text and raw agent output are never written to logs.
+- Node.js 20.9 or later
+- npm (the lockfile is provided; use `npm ci` for a reproducible install)
 
-Breakdown scores use a 0–100 scale. In this template-only implementation, Financial Health, Emotional Wellbeing, and Risk Level use a neutral score of 50 with an explanation because the app does not collect enough financial figures or wellbeing baselines to produce a meaningful estimate. Higher Risk Level means greater downside exposure. These scores are placeholders, not factual predictions or advice.
+From the repository root, in PowerShell:
 
-Errors use a stable envelope:
-
-```json
-{
-	"error": {
-		"code": "INVALID_REQUEST",
-		"message": "Request body does not match DecisionInput."
-	}
-}
-```
-
-Invalid JSON or input returns HTTP 400 with code `INVALID_REQUEST`. Unexpected orchestration or synthesis failures return HTTP 500 with code `INTERNAL_ERROR` and message `Simulation could not be completed.` Specialist execution failures are represented as `partial` or `failed` reports; internal exception details are not returned.
-
-## Local Development
-
-```sh
-npm install
+```powershell
+npm ci
 npm run dev
+```
+
+Open <http://localhost:3000>. Keep the development server running in that terminal. To stop it, press `Ctrl+C`.
+
+### Environment variables
+
+No environment variables are required for the current implementation. No API key is used. `.env.example` records that no variables are required; do not add real credentials to the repository.
+
+## Commands
+
+Run from the repository root:
+
+```powershell
 npm test
 npm run typecheck
 npm run build
 ```
 
-No AI provider or API key is used by this slice.
+To serve the production build locally after it succeeds:
 
-The home page provides the integrated decision form and partial report. Enter a question, two option labels, at least one comma-separated goal and priority, and optional comma-separated constraints. Submit to the local `POST /api/simulate` route; the form values stay available if the request fails. The report is checked against the shared schema and clearly lists perspectives that are not yet available.
-
-### Manual Smoke Test
-
-With the dev server running at `http://localhost:3000`, submit a valid request:
-
-```sh
-curl -i http://localhost:3000/api/simulate \
-	-H 'content-type: application/json' \
-	--data '{"question":"Should I go to graduate school or move to a new city?","options":[{"id":"A","label":"Graduate school","description":"Pursue an advanced degree."},{"id":"B","label":"Move to a new city","description":"Relocate for new opportunities."}],"goals":["career growth","personal fulfillment"],"priorities":["financial security","wellbeing"],"constraints":{"other":["limited time"]}}'
+```powershell
+npm run start
 ```
 
-Confirm HTTP 200, eight specialist results, `reportStatus: "complete"`, two synthesized option timelines, and no missing pairs. If any specialist is unavailable or returns invalid output, the API instead returns HTTP 200 with a `partial` or `failed` status, a null synthesis, and its missing agent-option keys. Check malformed JSON separately:
+There is currently no lint script in `package.json`; linting is not available as a project command.
 
-```sh
-curl -i http://localhost:3000/api/simulate \
-	-H 'content-type: application/json' \
-	--data '{invalid'
+## Sample data (for demonstration only)
+
+This sample is fictional and repeatable. Enter these values in the form:
+
+- **Question:** Should I pursue graduate school locally or move to a new city for work?
+- **Option A:** Graduate school - Pursue an advanced degree while staying near my current support network.
+- **Option B:** Move to a new city - Explore a new job market and build a new community.
+- **Goals:** Build a meaningful career; feel engaged in daily life.
+- **Priorities:** Learning; community.
+- **Other constraints:** Keep costs manageable; stay connected to family.
+
+The API accepts the corresponding JSON shape:
+
+```json
+{
+  "question": "Should I pursue graduate school locally or move to a new city for work?",
+  "options": [
+    {
+      "id": "A",
+      "label": "Graduate school",
+      "description": "Pursue an advanced degree while staying near my current support network."
+    },
+    {
+      "id": "B",
+      "label": "Move to a new city",
+      "description": "Explore a new job market and build a new community."
+    }
+  ],
+  "goals": ["Build a meaningful career", "Feel engaged in daily life"],
+  "priorities": ["Learning", "Community"],
+  "constraints": {
+    "other": ["Keep costs manageable", "Stay connected to family"]
+  }
+}
 ```
 
-This should return HTTP 400 with code `INVALID_REQUEST`.
+The server limits requests to 32 KiB, question and option descriptions to 1,000 characters, option labels to 200 characters, and each list item to 200 characters with at most 20 items in each list.
 
-## Current Limitations
+## Three-minute demo walkthrough
 
-All four deterministic specialist templates and the gated Narrator pipeline run, but there is no live AI integration, persistence, or authentication. Agreement and disagreement detection is deliberately conservative and lexical; nuanced semantic conflicts may not be recognized. Breakdown scores are neutral placeholders, not forecasts, until a grounded scoring method and appropriate personal baselines are defined. Invalid specialist output, duplicate results, or thrown specialist errors are not replaced with fabricated results; incomplete reports omit synthesis and identify missing pairs. The form resets on refresh.
+1. **0:00-0:25 - Introduce the problem.** "This prototype helps someone compare two paths by organizing questions around their goals, priorities, and constraints. It explores possibilities; it does not forecast the future or choose for the user."
+2. **0:25-0:55 - Enter the sample.** Use the sample decision above and submit it. Point out the two option descriptions and the goals, priorities, and constraints.
+3. **0:55-1:40 - Show the specialist perspectives.** Scroll to the option-by-option section. For each option, show the Optimist, Pessimist, Financial, and Wellbeing cards. Distinguish each card's findings from assumptions, uncertainties, and year 1/5/10 illustrative projections. Mention that the templates are deterministic and do not call a live AI service.
+4. **1:40-2:25 - Explain the Narrator comparison.** Show the at-a-glance comparison, attributed excerpts, and trade-off questions. Explain that the summary is composed from source findings, and that any agreement or disagreement is conservative. The scores are neutral placeholders, not estimates.
+5. **2:25-3:00 - Show uncertainty and reliability behavior.** Point to the explicit uncertainty and "not predictions" labels. Explain that if a specialist fails, the UI displays a partial or failed report, names the missing result, and withholds the Narrator comparison rather than filling the gap. In the current deterministic demo, failures are not user-triggerable from the form; the failure behavior is verified by automated tests rather than a demo control.
+
+## Limitations and future work
+
+- Specialist outputs are static templates, not personalized expert analysis or live AI responses.
+- Neutral scores of 50 are placeholders. No financial figures, wellbeing baseline, or validated scoring model is available.
+- Projections are prompts for reflection, not forecasts. Confidence is self-reported and is not a calibrated probability.
+- Agreement and disagreement detection is deliberately narrow and lexical; nuanced or semantic conflicts may not be detected.
+- There is no authentication, persistence, or request rate limiting. Do not enter highly sensitive information into a publicly exposed instance.
+- Form data is held in the browser for the current page and is not saved; refreshing starts a fresh session.
+- Future work, if this prototype advances, should include user research, clearer domain-specific guardrails, appropriate privacy/security review, and evaluation of any grounded scoring or AI integration before being represented as advice.
