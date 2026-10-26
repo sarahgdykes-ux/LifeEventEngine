@@ -26,6 +26,13 @@ const HORIZONS = [
   ["year10", "Year 10"],
 ] as const;
 
+const TRADEOFF_LABELS = {
+  financial: "Financial",
+  wellbeing: "Wellbeing",
+  opportunity: "Opportunity",
+  risk: "Risk",
+} as const;
+
 function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
   return (
     <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} overview scores`}>
@@ -35,6 +42,54 @@ function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
           <p>{score.rationale}</p>
         </article>
       ))}
+    </section>
+  );
+}
+
+function NarratorComparison({ synthesis }: { synthesis: OptionSynthesis }) {
+  return (
+    <section className="narrator-comparison" aria-label={`Narrator comparison for option ${synthesis.optionId}`}>
+      <p className="narrator-evidence-note">
+        Each excerpt is quoted from the named agent. These are agent perspectives, not verified facts; assumptions, uncertainties, and confidence are preserved in the perspectives below.
+      </p>
+      <h5>Key findings by perspective</h5>
+      <ul className="narrator-findings">
+        {synthesis.strongestFindings.map(({ agent, finding }) => (
+          <li key={agent}><strong>{AGENT_LABELS[agent]}:</strong> {finding}</li>
+        ))}
+      </ul>
+      <h5>Trade-offs to consider</h5>
+      <div className="narrator-tradeoffs">
+        {synthesis.tradeoffs.map(({ perspective, decisionQuestion, evidence }) => (
+          <section key={perspective}>
+            <h6>{TRADEOFF_LABELS[perspective]}</h6>
+            <p><strong>Consider:</strong> {decisionQuestion}</p>
+            {evidence.map(({ agent, finding }, index) => (
+              <p key={`${agent}-${index}`}><strong>{AGENT_LABELS[agent]}:</strong> {finding}</p>
+            ))}
+          </section>
+        ))}
+      </div>
+      <div className="narrator-alignment">
+        <section>
+          <h5>Shared findings</h5>
+          {synthesis.agreements.length > 0 ? (
+            <ul>{synthesis.agreements.map(({ finding, agents }) => (
+              <li key={finding}><strong>{agents.map((agent) => AGENT_LABELS[agent]).join(", ")}:</strong> {finding}</li>
+            ))}</ul>
+          ) : <p>No identical finding was shared by multiple agents.</p>}
+        </section>
+        <section>
+          <h5>Direct disagreements</h5>
+          {synthesis.disagreements.length > 0 ? (
+            <ul>{synthesis.disagreements.map(({ evidence }, index) => (
+              <li key={index}>{evidence.map(({ agent, finding }) => (
+                <p key={agent}><strong>{AGENT_LABELS[agent]}:</strong> {finding}</p>
+              ))}</li>
+            ))}</ul>
+          ) : <p>No direct contradiction was identified; different emphases are not necessarily disagreement.</p>}
+        </section>
+      </div>
     </section>
   );
 }
@@ -162,6 +217,7 @@ export default function SimulationReportView({ report, decision }: SimulationRep
                 <section className="overview-option" key={option.id} aria-label={`Option ${option.id}: ${option.label}`}>
                   <h4><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span>{option.label}</h4>
                   <BreakdownScores synthesis={synthesis} />
+                  <NarratorComparison synthesis={synthesis} />
                 </section>
               );
             })}

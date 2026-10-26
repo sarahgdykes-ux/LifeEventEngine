@@ -81,6 +81,21 @@ afterAll(() => {
 });
 
 describe("SimulationApp", () => {
+  it("renders a validated Narrator comparison for a complete report", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(completeReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    expect(screen.getAllByText("Key findings by perspective")).toHaveLength(2);
+    expect(screen.getAllByText("Trade-offs to consider")).toHaveLength(2);
+    expect(screen.getAllByText("Direct disagreements")).toHaveLength(2);
+    expect(screen.getAllByText(/No direct contradiction was identified/)).toHaveLength(2);
+    expect(screen.getAllByText(/Each excerpt is quoted from/)).toHaveLength(2);
+  });
+
   it("shows partial reports and identifies every missing result without filling gaps", async () => {
     const partialReport = makePartialReport();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(partialReport)));

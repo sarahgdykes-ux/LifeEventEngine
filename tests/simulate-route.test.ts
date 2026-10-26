@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/simulate/route";
 import * as orchestrator from "@/lib/orchestrator";
+import { Narrator } from "@/lib/narrator";
 import { SimulationReportSchema } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
 
@@ -105,6 +106,34 @@ describe("POST /api/simulate", () => {
     expect(JSON.stringify(body)).not.toContain("private detail");
     expect(JSON.stringify(log.mock.calls)).not.toContain("private detail");
     failure.mockRestore();
+    log.mockRestore();
+  });
+
+  it("returns a safe server error when Narrator synthesis throws", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const narrator = new Narrator();
+    vi.spyOn(narrator, "synthesize").mockImplementation(() => {
+      throw new Error("private narrator stack detail");
+    });
+    const originalRunSimulation = orchestrator.runSimulation;
+    const simulation = vi.spyOn(orchestrator, "runSimulation").mockImplementation(
+      (decision) => originalRunSimulation(decision, orchestrator.SPECIALIST_AGENTS, narrator),
+    );
+
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sampleDecision),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: { code: "INTERNAL_ERROR", message: "Simulation could not be completed." },
+    });
+    expect(JSON.stringify(body)).not.toContain("private narrator stack detail");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("private narrator stack detail");
+    simulation.mockRestore();
     log.mockRestore();
   });
 });

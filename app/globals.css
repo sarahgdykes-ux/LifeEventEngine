@@ -139,6 +139,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .score-card strong { display: block; margin-top: 2px; font-size: 15px; line-height: 1; }
 .score-card strong span { margin-left: 2px; color: var(--muted); font-size: 9px; font-weight: 500; }
 .score-card p { flex: 1; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
+.narrator-comparison { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.narrator-evidence-note { margin: 0 0 7px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.narrator-comparison > h5, .narrator-alignment h5 { margin: 9px 0 5px; color: var(--green-deep); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.narrator-findings, .narrator-alignment ul { display: grid; gap: 6px; margin: 0; padding-left: 17px; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.narrator-findings li::marker, .narrator-alignment li::marker { color: var(--coral); }
+.narrator-tradeoffs { display: grid; gap: 6px; }
+.narrator-tradeoffs section { padding: 7px; background: var(--white); }
+.narrator-tradeoffs h6 { margin: 0 0 3px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.narrator-tradeoffs p, .narrator-alignment p { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+.narrator-alignment { display: grid; gap: 8px; margin-top: 7px; }
+.narrator-alignment section { min-width: 0; }
+.narrator-alignment h5 { margin-top: 7px; }
+.narrator-alignment li p { display: inline; }
 .perspectives-section { margin-top: 20px; }
 .perspectives-heading { margin-bottom: 11px; }
 .perspectives-heading p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }

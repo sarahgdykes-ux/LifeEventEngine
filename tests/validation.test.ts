@@ -84,4 +84,54 @@ describe("shared runtime validation", () => {
       missingResults: ["financial:A"],
     })).toThrow();
   });
+
+  it("rejects Narrator summaries that alter source findings, projections, or scores", async () => {
+    const report = await runSimulation(sampleDecision);
+    const synthesis = report.synthesis;
+    if (!synthesis) throw new Error("Expected complete report synthesis");
+    const firstOption = synthesis.options[0];
+
+    expect(() => validateSimulationReport({
+      ...report,
+      synthesis: {
+        ...synthesis,
+        options: [{
+          ...firstOption,
+          strongestFindings: firstOption.strongestFindings.map((finding, index) =>
+            index === 0 ? { ...finding, finding: "Invented finding" } : finding,
+          ),
+        }, synthesis.options[1]],
+      },
+    })).toThrow(/Strongest findings must preserve/);
+
+    expect(() => validateSimulationReport({
+      ...report,
+      synthesis: {
+        ...synthesis,
+        options: [{
+          ...firstOption,
+          timeline: {
+            ...firstOption.timeline,
+            year1: firstOption.timeline.year1.map((projection, index) =>
+              index === 0 ? { ...projection, projection: "Invented forecast" } : projection,
+            ),
+          },
+        }, synthesis.options[1]],
+      },
+    })).toThrow(/Timeline projections must preserve/);
+
+    expect(() => validateSimulationReport({
+      ...report,
+      synthesis: {
+        ...synthesis,
+        options: [{
+          ...firstOption,
+          breakdownScores: {
+            ...firstOption.breakdownScores,
+            financialHealth: { ...firstOption.breakdownScores.financialHealth, value: 99 },
+          },
+        }, synthesis.options[1]],
+      },
+    })).toThrow(/Financial score must preserve/);
+  });
 });

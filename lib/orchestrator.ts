@@ -118,7 +118,7 @@ export async function runSimulation(
     console.info("Simulation narrator handoff started", {
       validatedResultCount: completeResults.length,
     });
-    synthesis = narratorAgent.synthesize(completeResults, decision.options);
+    synthesis = narratorAgent.synthesize(completeResults, decision);
   }
 
   return validateSimulationReport({
