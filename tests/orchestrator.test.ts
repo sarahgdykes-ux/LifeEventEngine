@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { SPECIALIST_AGENTS, runSimulation } from "@/lib/orchestrator";
-import { narrator } from "@/lib/narrator";
+import { narrator, type Narrator } from "@/lib/narrator";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import { SimulationReportSchema } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
@@ -80,6 +80,15 @@ describe("runSimulation", () => {
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
     expect(narrate).not.toHaveBeenCalled();
     narrate.mockRestore();
+  });
+
+  it("never returns a complete report when the Narrator returns invalid output", async () => {
+    const invalidNarrator: Narrator = {
+      synthesize: () => null as never,
+    };
+
+    await expect(runSimulation(sampleDecision, SPECIALIST_AGENTS, invalidNarrator))
+      .rejects.toThrow();
   });
 
   it("rejects duplicate agent-option outputs and marks the affected keys missing", async () => {

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import SimulationApp from "@/components/simulation-app";
 import { AGENT_NAMES, OPTION_IDS } from "@/lib/agents/types";
+import { Narrator } from "@/lib/narrator";
 import { runSimulation } from "@/lib/orchestrator";
 import { SimulationReportSchema, type SimulationReport } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
@@ -65,6 +66,18 @@ function makePartialReport(): SimulationReport {
   });
 }
 
+function makeFailedReport(): SimulationReport {
+  return SimulationReportSchema.parse({
+    ...completeReport,
+    results: [],
+    synthesis: null,
+    reportStatus: "failed",
+    missingResults: AGENT_NAMES.flatMap((agent) =>
+      OPTION_IDS.map((optionId) => `${agent}:${optionId}`),
+    ),
+  });
+}
+
 beforeAll(async () => {
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   completeReport = await runSimulation(sampleDecision);
@@ -89,11 +102,38 @@ describe("SimulationApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
 
     expect(await screen.findByText("Complete report")).toBeTruthy();
+    expect(screen.getAllByText("SPECIALIST PERSPECTIVE")).toHaveLength(8);
     expect(screen.getAllByText("Key findings by perspective")).toHaveLength(2);
     expect(screen.getAllByText("Trade-offs to consider")).toHaveLength(2);
     expect(screen.getAllByText("Direct disagreements")).toHaveLength(2);
     expect(screen.getAllByText(/No direct contradiction was identified/)).toHaveLength(2);
     expect(screen.getAllByText(/Each excerpt is quoted from/)).toHaveLength(2);
+  });
+
+  it("renders both sides of a source-backed disagreement", async () => {
+    const disagreeingResults = completeReport.results.map((result) => {
+      if (result.agent === "optimist" && result.optionId === "A") {
+        return { ...result, findings: ["Option A improves financial stability."] };
+      }
+      if (result.agent === "financial" && result.optionId === "A") {
+        return { ...result, findings: ["Option A does not improve financial stability."] };
+      }
+      return result;
+    });
+    const disagreeingReport = SimulationReportSchema.parse({
+      ...completeReport,
+      results: disagreeingResults,
+      synthesis: new Narrator().synthesize(disagreeingResults, sampleDecision),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(disagreeingReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    expect(screen.getAllByText("Option A improves financial stability.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Option A does not improve financial stability.").length).toBeGreaterThan(0);
   });
 
   it("shows partial reports and identifies every missing result without filling gaps", async () => {
@@ -116,6 +156,20 @@ describe("SimulationApp", () => {
     expect(screen.queryByText("At-a-glance comparison")).toBeNull();
     expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
       .toBe(sampleDecision.question);
+  });
+
+  it("renders a failed report with every unavailable result identified", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(makeFailedReport())));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+
+    expect(await screen.findByText("Report failed")).toBeTruthy();
+    expect(screen.getByText(/No specialist returned a complete result/)).toBeTruthy();
+    expect(screen.getAllByText(/not returned ·/)).toHaveLength(8);
+    expect(screen.getAllByText(/No validated result was returned/)).toHaveLength(8);
+    expect(screen.queryByText("At-a-glance comparison")).toBeNull();
   });
 
   it("prevents repeat submissions while the first request is pending", async () => {

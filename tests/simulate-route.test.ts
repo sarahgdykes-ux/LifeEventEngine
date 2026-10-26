@@ -24,6 +24,47 @@ describe("POST /api/simulate", () => {
     log.mockRestore();
   });
 
+  it("preserves changed goals, constraints, and distinct option context in the report", async () => {
+    const decision = {
+      ...sampleDecision,
+      options: [
+        { ...sampleDecision.options[0], description: "Requires evening study and tuition planning." },
+        { ...sampleDecision.options[1], description: "Requires a relocation plan and a new support network." },
+      ],
+      goals: ["finish a degree", "build a local community"],
+      priorities: ["manageable costs", "time with family"],
+      constraints: { other: ["limited savings", "caregiving schedule"] },
+    };
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(decision),
+    }));
+    const report = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(report.reportStatus).toBe("complete");
+    expect(report.synthesis.decisionContext).toEqual({
+      question: decision.question,
+      goals: decision.goals,
+      priorities: decision.priorities,
+      constraints: decision.constraints.other,
+      options: decision.options.map(({ id, label, description }) => ({
+        optionId: id,
+        label,
+        description,
+      })),
+    });
+    const financialFindings = report.results.find((result: { agent: string; optionId: string }) =>
+      result.agent === "financial" && result.optionId === "A",
+    ).findings.join(" ");
+    expect(financialFindings).toContain("limited savings");
+    expect(financialFindings).toContain("caregiving schedule");
+    expect(report.results.find((result: { agent: string; optionId: string }) =>
+      result.agent === "wellbeing" && result.optionId === "B",
+    ).findings.join(" ")).toContain("new support network");
+  });
+
   it("returns an explicit failed report when no specialist result is complete", async () => {
     const missingResults = [
       "optimist:A",
