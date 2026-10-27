@@ -1,6 +1,7 @@
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import { GeneratedOptionEventsSchema, EventPayloadSchema, type EventPayload, type GeneratedOptionEvents } from "@/lib/events/event-schema";
 import { AvatarStateSchema, type AvatarState } from "@/lib/events/state-schema";
+import { checkEventHandoff, generateCheckedEvent } from "@/lib/events/consistency-checker";
 
 const HORIZONS = [
   { key: "year1", years: 1 },
@@ -36,10 +37,15 @@ function optionEvent(
 
 export class EventGeneratorAgent {
   generateOptions(decision: DecisionInput, stateInput: unknown): GeneratedOptionEvents[] {
-    AvatarStateSchema.parse(stateInput);
+    const state = AvatarStateSchema.parse(stateInput);
     return decision.options.map((option) => GeneratedOptionEventsSchema.parse({
       optionId: option.id,
-      events: Object.fromEntries(HORIZONS.map(({ key, years }) => [key, optionEvent(option, years)])),
+      events: Object.fromEntries(HORIZONS.map(({ key, years }) => {
+        const payload = optionEvent(option, years);
+        const check = checkEventHandoff(payload, state);
+        if (!check.accepted) throw new Error(`Consistency Checker rejected generated option: ${check.reasons.join("; ")}`);
+        return [key, payload];
+      })),
     }));
   }
 
@@ -53,6 +59,14 @@ export class EventGeneratorAgent {
       proposed_effects: event.proposedEffects,
       commitments: event.commitments,
     });
+  }
+
+  async generateChecked<T>(
+    generate: (correctionReasons?: readonly string[]) => Promise<unknown>,
+    state: AvatarState,
+    history: readonly EventPayload[] = [],
+  ): Promise<T> {
+    return generateCheckedEvent<T>(generate, state, history);
   }
 
   buildPrompt(decision: DecisionInput, stateInput: unknown): string {

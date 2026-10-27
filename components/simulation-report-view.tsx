@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { AGENT_NAMES, OPTION_IDS, type AgentName, type OptionId } from "@/lib/agents/types";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, OptionSynthesis, SimulationReport } from "@/lib/schemas/simulation";
@@ -179,6 +182,7 @@ function OptionPerspective({
 }
 
 export default function SimulationReportView({ report, decision }: SimulationReportViewProps) {
+  const [auditAgent, setAuditAgent] = useState<AgentName>("optimist");
   const missingResultDetails = report.missingResults.map((key) => {
     const [agentKey, optionKey] = key.split(":");
     const agent = AGENT_NAMES.find((candidate) => candidate === agentKey);
@@ -256,6 +260,32 @@ export default function SimulationReportView({ report, decision }: SimulationRep
           ))}
         </div>
       </section>
+
+      <details className="developer-audit">
+        <summary>Developer audit view</summary>
+        <p>Validated handoff records and raw structured outputs returned by each specialist.</p>
+        <div className="audit-tabs" role="tablist" aria-label="Raw agent outputs">
+          {AGENT_NAMES.map((agent) => (
+            <button
+              aria-selected={auditAgent === agent}
+              id={`audit-tab-${agent}`}
+              key={agent}
+              onClick={() => setAuditAgent(agent)}
+              role="tab"
+              type="button"
+            >{AGENT_LABELS[agent]}</button>
+          ))}
+        </div>
+        <section aria-labelledby={`audit-tab-${auditAgent}`} className="audit-panel" role="tabpanel">
+          <pre>{JSON.stringify(report.results.filter(({ agent }) => agent === auditAgent), null, 2)}</pre>
+        </section>
+        <h4>Handoff audit log</h4>
+        {report.auditLog?.length ? (
+          <ol className="audit-log">{report.auditLog.map((entry, index) => (
+            <li key={`${entry.key}-${index}`}><code>{entry.stage} · {entry.outcome} · {entry.key}</code><span>{entry.detail}</span></li>
+          ))}</ol>
+        ) : <p>No handoff audit records were included in this report.</p>}
+      </details>
 
       <p className="report-disclaimer">Use these perspectives as prompts for reflection, not as predictions or recommendations.</p>
     </div>

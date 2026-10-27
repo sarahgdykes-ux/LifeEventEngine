@@ -178,6 +178,13 @@ export const MissingResultSchema = z.string().regex(
   "Must identify an agent-option pair",
 );
 
+export const HandoffAuditEntrySchema = z.object({
+  key: z.string().min(1),
+  stage: z.enum(["agent_output", "handoff", "narrator"]),
+  outcome: z.enum(["accepted", "rejected", "started"]),
+  detail: z.string().min(1),
+});
+
 export const SimulationReportSchema = z
   .object({
     decisionId: RequiredTextSchema,
@@ -185,6 +192,7 @@ export const SimulationReportSchema = z
     synthesis: SimulationSynthesisSchema.nullable(),
     reportStatus: z.enum(["complete", "partial", "failed"]),
     missingResults: z.array(MissingResultSchema),
+    auditLog: z.array(HandoffAuditEntrySchema).optional(),
   })
   .superRefine((report, context) => {
     const completeResultIds = new Set(

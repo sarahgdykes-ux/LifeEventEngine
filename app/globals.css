@@ -162,6 +162,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .option-perspective > h3 { display: flex; align-items: center; gap: 8px; margin: 0; font: 400 17px/1.25 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
 .option-perspective-description { margin: 5px 0 0 31px; color: var(--muted); font-size: 11px; }
 .option-agent-results { display: grid; gap: 9px; margin-top: 11px; }
+.developer-audit { margin-top: 20px; padding: 12px; border: 1px solid var(--line); background: #f8faf7; }
+.developer-audit > summary { cursor: pointer; font-weight: 650; }
+.developer-audit > p { color: var(--muted); font-size: 12px; }
+.audit-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 8px; }
+.audit-tabs button { border: 1px solid var(--line); border-radius: 3px; padding: 6px 9px; background: white; color: var(--ink); cursor: pointer; }
+.audit-tabs button[aria-selected="true"] { border-color: var(--green); background: var(--green); color: white; }
+.audit-panel { max-height: 380px; overflow: auto; border: 1px solid var(--line); background: #fff; }
+.audit-panel pre { margin: 0; padding: 11px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.developer-audit h4 { margin: 14px 0 6px; }
+.audit-log { display: grid; gap: 5px; padding-left: 20px; font-size: 11px; }
+.audit-log li code { margin-right: 7px; color: var(--green); }
 .agent-result { min-width: 0; padding: 12px; border: 1px solid var(--line); background: var(--white); }
 .agent-result-incomplete { border-color: #e1c68f; }
 .result-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
