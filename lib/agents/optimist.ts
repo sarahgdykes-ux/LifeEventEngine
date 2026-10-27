@@ -1,16 +1,19 @@
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
+import { describeDecisionContext } from "@/lib/agents/context";
 
 export class OptimistAgent implements SpecialistAgent {
   readonly name = "optimist" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    const context = describeDecisionContext(decision, option);
     return {
       agent: this.name,
       optionId: option.id,
       findings: [
         `Illustrative possibility: ${option.label} could create useful opportunities to pursue the decision's goals. This is a reflection prompt, not a factual prediction.`,
+        `Use the shared starting-state assumptions as a progress baseline: ${context.baseline}`,
       ],
       assumptions: [
         `This scenario assumes the person can make a sustained effort toward ${option.label.toLowerCase()} while adapting as circumstances change.`,

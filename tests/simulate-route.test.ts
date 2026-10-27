@@ -65,6 +65,79 @@ describe("POST /api/simulate", () => {
     ).findings.join(" ")).toContain("new support network");
   });
 
+  it("runs both options through the state projection pipeline with clamping and state-derived scores", async () => {
+    const decision = {
+      ...sampleDecision,
+      baselineState: {
+        ...sampleDecision.baselineState!,
+        stats: { ...sampleDecision.baselineState!.stats, finances: 95 },
+      },
+      scenarioEffects: sampleDecision.scenarioEffects!.map((scenario) => ({
+        ...scenario,
+        horizons: {
+          year1: { ...scenario.horizons.year1, finances: scenario.optionId === "A" ? 20 : -20 },
+          year5: { ...scenario.horizons.year5, finances: scenario.optionId === "A" ? 20 : -20 },
+          year10: { ...scenario.horizons.year10, finances: scenario.optionId === "A" ? 20 : -20 },
+        },
+      })),
+    };
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(decision),
+    }));
+    const report = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
+    const optionA = report.stateProjection.options.find((option: { optionId: string }) => option.optionId === "A");
+    const optionB = report.stateProjection.options.find((option: { optionId: string }) => option.optionId === "B");
+    expect(optionA.horizons.year1.state.stats.finances).toBe(100);
+    expect(optionB.horizons.year1.state.stats.finances).toBe(75);
+    expect(optionA.horizons.year10.state.year).toBe(2036);
+    expect(optionA.horizons.year10.event.mutation_tag).toBe("BASELINE_PRESERVING_OPTION");
+    expect(report.synthesis.options.find((option: { optionId: string }) => option.optionId === "A").breakdownScores.financialHealth.value).toBe(100);
+    expect(report.synthesis.options.find((option: { optionId: string }) => option.optionId === "B").breakdownScores.financialHealth.value).toBe(75);
+  });
+
+  it("retries a health death-spiral assumption with a safe unchanged-state projection and audit flag", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const decision = {
+      ...sampleDecision,
+      baselineState: {
+        ...sampleDecision.baselineState!,
+        stats: { ...sampleDecision.baselineState!.stats, health: 20 },
+      },
+      scenarioEffects: sampleDecision.scenarioEffects!.map((scenario) => scenario.optionId === "A"
+        ? {
+            ...scenario,
+            horizons: {
+              year1: { ...scenario.horizons.year1, health: -20 },
+              year5: { ...scenario.horizons.year5, health: -20 },
+              year10: { ...scenario.horizons.year10, health: -20 },
+            },
+          }
+        : scenario),
+    };
+    const response = await POST(new Request("http://localhost/api/simulate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(decision),
+    }));
+    const report = await response.json();
+    const optionA = report.stateProjection.options.find((option: { optionId: string }) => option.optionId === "A");
+
+    expect(response.status).toBe(200);
+    expect(optionA.horizons.year10.state.stats.health).toBe(20);
+    expect(optionA.horizons.year10.correctionReasons.join(" ")).toContain("Health reaches 0");
+    expect(optionA.trajectoryReview.status).toBe("at_risk");
+    expect(optionA.trajectoryReview.flags.join(" ")).toContain("Rejected proposed projection");
+    expect(report.auditLog.some((entry: { key: string; detail: string }) =>
+      entry.key === "event:A:year10" && entry.detail.includes("safe unchanged-state retry"),
+    )).toBe(true);
+    log.mockRestore();
+  });
+
   it("returns an explicit failed report when no specialist result is complete", async () => {
     const missingResults = [
       "optimist:A",

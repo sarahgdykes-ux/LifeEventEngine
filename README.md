@@ -1,6 +1,6 @@
 # Life Decision Simulator
 
-A small prototype for people exploring a consequential personal decision with two possible paths. It organizes reflection around a user's question, goals, priorities, and constraints. It does **not** predict what will happen, verify claims, or recommend a choice.
+A small prototype for people exploring a consequential personal decision with exactly two distinct choice options for the P0 MVP (with future extensibility for three). It organizes reflection around a user's question, goals, priorities, constraints, and an editable shared baseline state. It does **not** predict what will happen, verify claims, or recommend a choice.
 
 ## What the prototype does
 
@@ -15,18 +15,19 @@ The **Narrator** compares the specialist findings, preserves their attribution, 
 
 ### Workflow
 
-1. Enter a decision question, two options, goals, priorities, and optional constraints.
-2. The server validates the request and runs each of the four specialists for both options (eight results total).
-3. The Narrator runs only if all eight results are present, unique, valid, and complete.
-4. The UI shows the summary and source perspectives, including findings, assumptions, uncertainties, and illustrative projections. If results are missing or invalid, the UI identifies the gaps and does not show a synthesized comparison.
+1. Enter a decision question, two options, goals, priorities, optional constraints, and an editable baseline state.
+2. Enter scenario delta assumptions for both options at the 1-, 5-, and 10-year horizons. Each horizon is an independent branch from the shared baseline.
+3. The server validates the request, generates structured option events, runs preflight and consistency checks, and projects candidate states with stat clamping and commitment updates.
+4. Four deterministic specialists run in parallel for both options (eight results total). Their financial, wellbeing, and risk scores derive from the supplied baseline and Year 10 projected states.
+5. The Narrator runs only if all eight specialist results are present, unique, valid, and complete. The UI shows the comparative report, state projections, trajectory review flags, raw validated outputs, and handoff audit logs.
 
 ## Event generation engine contract
 
-The `lib/events` module defines the avatar baseline, event payload schema, pre-flight validator, deterministic option-event templates, and pure state projection/mutation logic. Decision alternatives produce `BASELINE_PRESERVING_OPTION` payloads for the 1-, 5-, and 10-year horizons. These payloads create hypothetical projected states while leaving the active baseline unchanged. A `BASELINE_MUTATING_EVENT` payload is created only from an explicitly described event with a stated cause; applying it advances the active state.
+The `lib/events` module defines the avatar baseline, event payload schema, pre-flight validator, deterministic option-event builder, consistency checker, and pure state projection/mutation logic. User-entered deltas and commitment changes produce `BASELINE_PRESERVING_OPTION` payloads for the 1-, 5-, and 10-year horizons. Each horizon creates a hypothetical projected state from the unchanged baseline. A `BASELINE_MUTATING_EVENT` payload is reserved for an explicitly described event with a stated cause; applying it advances the active state.
 
 State stats are integers from 0 to 100 and are clamped to that range after applying integer deltas from -20 to +20. Event payloads require an uppercase snake-case type, mutation tag, delta justification, horizon, description, proposed effects, and new/ended commitment lists. `validate_payload` returns an empty list for valid payloads or path-qualified validation errors; generated payloads are schema-validated before being returned.
 
-This is currently an engine-side TypeScript contract and deterministic template module. The app does not yet collect avatar state, call an LLM, expose an event-generation route, or contain a Consistency Checker, so no downstream checker integration is claimed.
+The app collects an editable shared state and user-supplied scenario assumptions and passes them through the projection pipeline. A rejected event gets one bounded correction attempt, then uses a safe unchanged-state fallback with an audit flag. The app does not call an LLM: event effects and specialist perspectives are deterministic and user-directed, not model-generated.
 
 ## Technology
 
@@ -106,7 +107,33 @@ The API accepts the corresponding JSON shape:
   "priorities": ["Learning", "Community"],
   "constraints": {
     "other": ["Keep costs manageable", "Stay connected to family"]
-  }
+  },
+  "baselineState": {
+    "character": { "name": "Alex", "age": 28, "background": "Early-career professional" },
+    "year": 2026,
+    "stats": { "finances": 65, "wellbeing": 70, "health": 80, "career": 60 },
+    "commitments": ["Current_Job", "Apartment_Lease"]
+  },
+  "scenarioEffects": [
+    {
+      "optionId": "A",
+      "horizons": {
+        "year1": { "finances": -6, "wellbeing": -2, "health": 0, "career": 3 },
+        "year5": { "finances": -10, "wellbeing": -4, "health": 0, "career": 8 },
+        "year10": { "finances": -12, "wellbeing": -2, "health": 0, "career": 12 }
+      },
+      "commitments": { "new": ["Graduate_Program"], "ended": [] }
+    },
+    {
+      "optionId": "B",
+      "horizons": {
+        "year1": { "finances": -8, "wellbeing": -6, "health": -1, "career": 10 },
+        "year5": { "finances": 3, "wellbeing": -3, "health": -1, "career": 14 },
+        "year10": { "finances": 8, "wellbeing": 2, "health": 0, "career": 16 }
+      },
+      "commitments": { "new": ["New_Role"], "ended": ["Current_Job"] }
+    }
+  ]
 }
 ```
 
@@ -117,13 +144,13 @@ The server limits requests to 32 KiB, question and option descriptions to 1,000 
 1. **0:00-0:25 - Introduce the problem.** "This prototype helps someone compare two paths by organizing questions around their goals, priorities, and constraints. It explores possibilities; it does not forecast the future or choose for the user."
 2. **0:25-0:55 - Enter the sample.** Use the sample decision above and submit it. Point out the two option descriptions and the goals, priorities, and constraints.
 3. **0:55-1:40 - Show the specialist perspectives.** Scroll to the option-by-option section. For each option, show the Optimist, Pessimist, Financial, and Wellbeing cards. Distinguish each card's findings from assumptions, uncertainties, and year 1/5/10 illustrative projections. Mention that the templates are deterministic and do not call a live AI service.
-4. **1:40-2:25 - Explain the Narrator comparison.** Show the at-a-glance comparison, attributed excerpts, and trade-off questions. Explain that the summary is composed from source findings, and that any agreement or disagreement is conservative. The scores are neutral placeholders, not estimates.
-5. **2:25-3:00 - Show uncertainty and reliability behavior.** Point to the explicit uncertainty and "not predictions" labels. Explain that if a specialist fails, the UI displays a partial or failed report, names the missing result, and withholds the Narrator comparison rather than filling the gap. In the current deterministic demo, failures are not user-triggerable from the form; the failure behavior is verified by automated tests rather than a demo control.
+4. **1:40-2:25 - Explain the Narrator comparison.** Show the at-a-glance comparison, attributed excerpts, trade-off questions, and user-assumption-driven state projections. Explain that the summary is composed from source findings, and that any agreement or disagreement is conservative. Scores are derived from supplied scenario assumptions; they are not calibrated estimates.
+5. **2:25-3:00 - Show uncertainty and reliability behavior.** Point to the explicit uncertainty and "not predictions" labels. Explain that if a specialist fails, the UI displays a partial or failed report, names the missing result, and withholds the Narrator comparison rather than filling the gap. The developer audit view shows validated outputs, handoff results, and safe-fallback flags.
 
 ## Limitations and future work
 
 - Specialist outputs are static templates, not personalized expert analysis or live AI responses.
-- Neutral scores of 50 are placeholders. No financial figures, wellbeing baseline, or validated scoring model is available.
+- Scores are deterministic indicators derived from the user-entered baseline and scenario deltas; they are not measured, calibrated, or validated assessments.
 - Projections are prompts for reflection, not forecasts. Confidence is self-reported and is not a calibrated probability.
 - Agreement and disagreement detection is deliberately narrow and lexical; nuanced or semantic conflicts may not be detected.
 - There is no authentication, persistence, or request rate limiting. Do not enter highly sensitive information into a publicly exposed instance.

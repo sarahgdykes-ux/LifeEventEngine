@@ -1,7 +1,7 @@
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import { GeneratedOptionEventsSchema, EventPayloadSchema, type EventPayload, type GeneratedOptionEvents } from "@/lib/events/event-schema";
 import { AvatarStateSchema, type AvatarState } from "@/lib/events/state-schema";
-import { checkEventHandoff, generateCheckedEvent } from "@/lib/events/consistency-checker";
+import { generateCheckedEvent } from "@/lib/events/consistency-checker";
 
 const HORIZONS = [
   { key: "year1", years: 1 },
@@ -21,16 +21,26 @@ export interface ExplicitLifeEvent {
 function optionEvent(
   option: DecisionOption,
   years: 1 | 5 | 10,
+  scenario?: NonNullable<DecisionInput["scenarioEffects"]>[number],
 ): EventPayload {
   const horizon = years === 1 ? "1 year" : `${years} years`;
+  const horizonKey = years === 1 ? "year1" : years === 5 ? "year5" : "year10";
+  const deltas = scenario?.horizons[horizonKey];
+  const proposedEffects = deltas
+    ? Object.entries(deltas).flatMap(([stat, delta]) => delta === 0 ? [] : [{ stat, delta }])
+    : [];
+  const hasEffects = proposedEffects.length > 0
+    || Boolean(scenario?.commitments.new.length || scenario?.commitments.ended.length);
   const event = {
     event_type: "DECISION_OPTION",
     mutation_tag: "BASELINE_PRESERVING_OPTION",
-    delta_justification: "This is a hypothetical option branch. No state changes are inferred without supporting information.",
+    delta_justification: hasEffects
+      ? "Effects are user-supplied scenario assumptions for exploration, not factual estimates or predictions."
+      : "No stat or commitment changes were supplied for this hypothetical branch.",
     horizon_years: years,
     description: `Explore "${option.label}" over ${horizon}; review progress against the goals and priorities supplied for this decision.`,
-    proposed_effects: [],
-    commitments: { new: [], ended: [] },
+    proposed_effects: proposedEffects,
+    commitments: scenario?.commitments ?? { new: [], ended: [] },
   };
   return EventPayloadSchema.parse(event);
 }
@@ -41,10 +51,8 @@ export class EventGeneratorAgent {
     return decision.options.map((option) => GeneratedOptionEventsSchema.parse({
       optionId: option.id,
       events: Object.fromEntries(HORIZONS.map(({ key, years }) => {
-        const payload = optionEvent(option, years);
-        const check = checkEventHandoff(payload, state);
-        if (!check.accepted) throw new Error(`Consistency Checker rejected generated option: ${check.reasons.join("; ")}`);
-        return [key, payload];
+        const scenario = decision.scenarioEffects?.find(({ optionId }) => optionId === option.id);
+        return [key, optionEvent(option, years, scenario)];
       })),
     }));
   }

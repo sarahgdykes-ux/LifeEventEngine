@@ -15,6 +15,7 @@ export class PessimistAgent implements SpecialistAgent {
       findings: [
         `Risk review for "${context.question}": for ${context.option}, test how a setback could interfere with the goals of ${context.goals}, especially the priorities of ${context.priorities}.`,
         `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`,
+        `Check the downside against the supplied starting state: ${context.baseline}`,
       ],
       assumptions: [
         `This is an illustrative downside scenario, not a verified fact or prediction; it assumes an unexpected obstacle could limit progress on ${context.goals}.`,

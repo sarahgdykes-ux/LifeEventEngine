@@ -28,6 +28,7 @@ const HORIZONS = [
   ["year5", "Year 5"],
   ["year10", "Year 10"],
 ] as const;
+const STATE_STATS = ["finances", "wellbeing", "health", "career"] as const;
 
 const TRADEOFF_LABELS = {
   financial: "Financial",
@@ -213,6 +214,45 @@ export default function SimulationReportView({ report, decision }: SimulationRep
         <p className="report-status-explanation">
           No specialist returned a complete result. Any returned details are shown below; missing perspectives have not been filled in.
         </p>
+      )}
+
+      {report.stateProjection && (
+        <section className="state-projection-report" aria-labelledby="state-projection-title">
+          <h3 id="state-projection-title">State projections from your assumptions</h3>
+          <p>Each horizon is projected independently from the same baseline. The entered deltas are scenario assumptions, not predictions.</p>
+          <div className="state-projection-options">
+            {report.stateProjection.options.map((optionProjection) => {
+              const option = decision.options.find(({ id }) => id === optionProjection.optionId);
+              if (!option) return null;
+              return (
+                <section className="state-projection-option" key={optionProjection.optionId}>
+                  <h4>Option {optionProjection.optionId}: {option.label}</h4>
+                  <div className="state-projection-horizons">
+                    {HORIZONS.map(([horizon, label]) => {
+                      const projection = optionProjection.horizons[horizon];
+                      return (
+                        <article key={horizon}>
+                          <h5>{label} · Age {projection.state.character.age} · {projection.state.year}</h5>
+                          <dl>{STATE_STATS.map((stat) => (
+                            <div key={stat}><dt>{stat}</dt><dd>{projection.state.stats[stat]}</dd></div>
+                          ))}</dl>
+                          <p>{projection.executionSummary}</p>
+                          {projection.correctionReasons.length > 0 && <p className="trajectory-warning">Safe fallback used: {projection.correctionReasons.join("; ")}</p>}
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <p className={`trajectory-status trajectory-status-${optionProjection.trajectoryReview.status}`}>
+                    Trajectory review: {optionProjection.trajectoryReview.status.replace("_", " ")}
+                  </p>
+                  {optionProjection.trajectoryReview.flags.length > 0 && (
+                    <ul>{optionProjection.trajectoryReview.flags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {report.synthesis && (

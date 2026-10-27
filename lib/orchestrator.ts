@@ -7,6 +7,7 @@ import { WellbeingAgent } from "@/lib/agents/wellbeing";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, SimulationReport } from "@/lib/schemas/simulation";
 import { narrator, type Narrator } from "@/lib/narrator";
+import { deriveStateScores, projectDecisionState } from "@/lib/agents/state-projection";
 import {
   validateAgentResult,
   validateCompleteAgentHandoff,
@@ -31,6 +32,20 @@ export async function runSimulation(
   narratorAgent: Narrator = narrator,
 ): Promise<SimulationReport> {
   const auditLog: NonNullable<SimulationReport["auditLog"]> = [];
+  const stateProjection = await projectDecisionState(decision);
+  stateProjection?.options.forEach((option) => {
+    Object.entries(option.horizons).forEach(([horizon, projection]) => {
+      if (projection.correctionReasons.length > 0) {
+        auditLog.push({
+          key: `event:${option.optionId}:${horizon}`,
+          stage: "handoff",
+          outcome: "accepted",
+          detail: `Consistency Checker requested a safe unchanged-state retry: ${projection.correctionReasons.join("; ")}`,
+        });
+      }
+    });
+  });
+  const projectionsByOption = new Map(stateProjection?.options.map((projection) => [projection.optionId, projection]) ?? []);
   const candidates = await Promise.all(agents.flatMap((agent) => decision.options.map(async (option) => {
     const requestedKey = `${agent.name}:${option.id}`;
     let output: unknown;
@@ -58,6 +73,18 @@ export async function runSimulation(
         schemaValid: false,
       });
       return { matchesRequestedKey: false } satisfies AgentAttempt;
+    }
+
+    const stateProjectionForOption = projectionsByOption.get(option.id);
+    if (stateProjectionForOption && stateProjection) {
+      const derivedScores = deriveStateScores(stateProjectionForOption, stateProjection.baselineState);
+      if (result.agent === "financial") {
+        result.scores.financialHealth = derivedScores.financialHealth;
+      } else if (result.agent === "wellbeing") {
+        result.scores.emotionalWellbeing = derivedScores.emotionalWellbeing;
+      } else if (result.agent === "pessimist") {
+        result.scores.riskLevel = derivedScores.riskLevel;
+      }
     }
 
     const matchesRequestedKey = result.agent === agent.name && result.optionId === option.id;
@@ -137,5 +164,6 @@ export async function runSimulation(
     reportStatus,
     missingResults,
     auditLog,
+    ...(stateProjection ? { stateProjection } : {}),
   });
 }

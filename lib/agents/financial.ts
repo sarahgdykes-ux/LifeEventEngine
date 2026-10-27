@@ -15,6 +15,7 @@ export class FinancialAgent implements SpecialistAgent {
       findings: [
         `For "${context.question}", make a side-by-side budget for ${context.option} that includes income changes, one-time costs, recurring expenses, debt, and savings before judging its fit with ${context.goals}.`,
         `Check whether the budget protects the priority of ${context.priorities} while staying within the constraint(s): ${context.constraints}.`,
+        `Use the supplied finances stat as a relative starting marker, not a cash balance: ${context.baseline}`,
       ],
       assumptions: [
         `No personal income, expense, debt, savings, or location-specific cost figures were supplied for ${context.option}; these prompts are illustrative and do not establish a financial outcome.`,
