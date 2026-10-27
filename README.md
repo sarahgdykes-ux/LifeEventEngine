@@ -20,6 +20,14 @@ The **Narrator** compares the specialist findings, preserves their attribution, 
 3. The Narrator runs only if all eight results are present, unique, valid, and complete.
 4. The UI shows the summary and source perspectives, including findings, assumptions, uncertainties, and illustrative projections. If results are missing or invalid, the UI identifies the gaps and does not show a synthesized comparison.
 
+## Event generation engine contract
+
+The `lib/events` module defines the avatar baseline, event payload schema, pre-flight validator, deterministic option-event templates, and pure state projection/mutation logic. Decision alternatives produce `BASELINE_PRESERVING_OPTION` payloads for the 1-, 5-, and 10-year horizons. These payloads create hypothetical projected states while leaving the active baseline unchanged. A `BASELINE_MUTATING_EVENT` payload is created only from an explicitly described event with a stated cause; applying it advances the active state.
+
+State stats are integers from 0 to 100 and are clamped to that range after applying integer deltas from -20 to +20. Event payloads require an uppercase snake-case type, mutation tag, delta justification, horizon, description, proposed effects, and new/ended commitment lists. `validate_payload` returns an empty list for valid payloads or path-qualified validation errors; generated payloads are schema-validated before being returned.
+
+This is currently an engine-side TypeScript contract and deterministic template module. The app does not yet collect avatar state, call an LLM, expose an event-generation route, or contain a Consistency Checker, so no downstream checker integration is claimed.
+
 ## Technology
 
 - Next.js 16 App Router and route handlers
