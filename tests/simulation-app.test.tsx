@@ -138,6 +138,27 @@ describe("SimulationApp", () => {
     expect(screen.getAllByText("Option A does not improve financial stability.").length).toBeGreaterThan(0);
   });
 
+  it("shows clean and recovered retry badges in the developer audit view", async () => {
+    const retryReport = SimulationReportSchema.parse({
+      ...completeReport,
+      auditLog: completeReport.auditLog?.map((entry) => ({
+        ...entry,
+        ...(entry.key === "optimist:A" ? { retriesUsed: 2 } : {}),
+        ...(entry.key === "optimist:B" ? { retriesUsed: 0 } : {}),
+      })),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(retryReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    fireEvent.click(screen.getByText("Developer audit view"));
+
+    expect(screen.getByText("2 retries required")).toBeTruthy();
+    expect(screen.getByText("0 retries (clean)")).toBeTruthy();
+  });
+
   it("shows partial reports and identifies every missing result without filling gaps", async () => {
     const partialReport = makePartialReport();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(partialReport)));

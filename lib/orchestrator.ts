@@ -24,6 +24,7 @@ export const SPECIALIST_AGENTS: readonly SpecialistAgent[] = [
 interface AgentAttempt {
   result?: AgentResult;
   matchesRequestedKey: boolean;
+  retriesUsed: number;
 }
 
 export async function runSimulation(
@@ -49,9 +50,16 @@ export async function runSimulation(
   const candidates = await Promise.all(agents.flatMap((agent) => decision.options.map(async (option) => {
     const requestedKey = `${agent.name}:${option.id}`;
     let output: unknown;
+    let retriesUsed = 0;
 
     try {
-      output = await agent.analyze(decision, option);
+      if (agent.analyzeWithMetadata) {
+        const execution = await agent.analyzeWithMetadata(decision, option);
+        output = execution.result;
+        retriesUsed = execution.retriesUsed;
+      } else {
+        output = await agent.analyze(decision, option);
+      }
     } catch (error) {
       auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Agent execution failed." });
       console.error("Simulation agent result rejected", {
@@ -59,20 +67,20 @@ export async function runSimulation(
         failureType: "agent_error",
         schemaValid: false,
       });
-      return { matchesRequestedKey: false } satisfies AgentAttempt;
+      return { matchesRequestedKey: false, retriesUsed } satisfies AgentAttempt;
     }
 
     let result: AgentResult;
     try {
       result = validateAgentResult(output);
     } catch {
-      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation." });
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation.", retriesUsed });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "invalid_output",
         schemaValid: false,
       });
-      return { matchesRequestedKey: false } satisfies AgentAttempt;
+      return { matchesRequestedKey: false, retriesUsed } satisfies AgentAttempt;
     }
 
     const stateProjectionForOption = projectionsByOption.get(option.id);
@@ -89,23 +97,23 @@ export async function runSimulation(
 
     const matchesRequestedKey = result.agent === agent.name && result.optionId === option.id;
     if (!matchesRequestedKey) {
-      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff." });
+      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff.", retriesUsed });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "key_mismatch",
         schemaValid: true,
       });
-      return { result, matchesRequestedKey } satisfies AgentAttempt;
+      return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
     }
 
-    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation." });
+    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation.", retriesUsed });
 
     console.info("Simulation agent output schema validated", {
       agent: result.agent,
       optionId: result.optionId,
       schemaValid: true,
     });
-    return { result, matchesRequestedKey } satisfies AgentAttempt;
+    return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
   })));
 
   const attemptsByResultKey = new Map<string, AgentAttempt[]>();

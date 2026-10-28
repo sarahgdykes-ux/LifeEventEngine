@@ -185,6 +185,7 @@ export const HandoffAuditEntrySchema = z.object({
   stage: z.enum(["agent_output", "handoff", "narrator"]),
   outcome: z.enum(["accepted", "rejected", "started"]),
   detail: z.string().min(1),
+  retriesUsed: z.number().int().nonnegative().optional(),
 });
 
 const StateHorizonProjectionSchema = z.object({
