@@ -68,7 +68,7 @@ export class EventGeneratorAgent {
     const state = AvatarStateSchema.parse(stateInput);
     const scenario = decision.scenarioEffects?.find(({ optionId }) => optionId === option.id);
     const supplied = optionEvent(option, years, scenario);
-    let generated: EventPayload | undefined;
+    let generated: { data: EventPayload; retriesUsed: number } | undefined;
     try {
       generated = await generateStructuredAgentOutput({
         schema: EventPayloadSchema,
@@ -91,7 +91,7 @@ export class EventGeneratorAgent {
       generated = undefined;
     }
     return EventPayloadSchema.parse({
-      ...(generated ?? supplied),
+      ...(generated?.data ?? supplied),
       event_type: "DECISION_OPTION",
       mutation_tag: "BASELINE_PRESERVING_OPTION",
       horizon_years: years,
