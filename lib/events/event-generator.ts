@@ -2,6 +2,7 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import { GeneratedOptionEventsSchema, EventPayloadSchema, type EventPayload, type GeneratedOptionEvents } from "@/lib/events/event-schema";
 import { AvatarStateSchema, type AvatarState } from "@/lib/events/state-schema";
 import { generateCheckedEvent } from "@/lib/events/consistency-checker";
+import { generateStructuredAgentOutput } from "@/lib/llm/adapter";
 
 const HORIZONS = [
   { key: "year1", years: 1 },
@@ -55,6 +56,48 @@ export class EventGeneratorAgent {
         return [key, optionEvent(option, years, scenario)];
       })),
     }));
+  }
+
+  async generateOptionEvent(
+    decision: DecisionInput,
+    option: DecisionOption,
+    stateInput: unknown,
+    years: 1 | 5 | 10,
+    correctionReasons?: readonly string[],
+  ): Promise<EventPayload> {
+    const state = AvatarStateSchema.parse(stateInput);
+    const scenario = decision.scenarioEffects?.find(({ optionId }) => optionId === option.id);
+    const supplied = optionEvent(option, years, scenario);
+    let generated: EventPayload | undefined;
+    try {
+      generated = await generateStructuredAgentOutput({
+        schema: EventPayloadSchema,
+        systemPrompt: [
+          "You are an event generator for a life decision simulator. Describe a plausible scenario checkpoint using only the decision, baseline, option, and user-supplied effects.",
+          "Do not invent stat effects or commitments. The user-supplied assumptions are authoritative; describe their implications without turning them into factual predictions.",
+          "Return one event payload for this horizon. Keep it a BASELINE_PRESERVING_OPTION branch.",
+        ].join(" "),
+        prompt: JSON.stringify({
+          decision,
+          option,
+          baselineState: state,
+          horizonYears: years,
+          suppliedEffects: supplied.proposed_effects,
+          suppliedCommitments: supplied.commitments,
+          correctionReasons,
+        }),
+      });
+    } catch {
+      generated = undefined;
+    }
+    return EventPayloadSchema.parse({
+      ...(generated ?? supplied),
+      event_type: "DECISION_OPTION",
+      mutation_tag: "BASELINE_PRESERVING_OPTION",
+      horizon_years: years,
+      proposed_effects: supplied.proposed_effects,
+      commitments: supplied.commitments,
+    });
   }
 
   generateExplicitEvent(event: ExplicitLifeEvent): EventPayload {

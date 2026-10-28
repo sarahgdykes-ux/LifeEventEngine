@@ -18,26 +18,27 @@ The **Narrator** compares the specialist findings, preserves their attribution, 
 1. Enter a decision question, two options, goals, priorities, optional constraints, and an editable baseline state.
 2. Enter scenario delta assumptions for both options at the 1-, 5-, and 10-year horizons. Each horizon is an independent branch from the shared baseline.
 3. The server validates the request, generates structured option events, runs preflight and consistency checks, and projects candidate states with stat clamping and commitment updates.
-4. Four deterministic specialists run in parallel for both options (eight results total). Their financial, wellbeing, and risk scores derive from the supplied baseline and Year 10 projected states.
+4. Four specialists run in parallel for both options (eight results total). Mock mode uses deterministic specialist outputs; live mode uses schema-constrained provider responses. Financial, wellbeing, and risk scores derive from the supplied baseline and Year 10 projected states.
 5. The Narrator runs only if all eight specialist results are present, unique, valid, and complete. The UI shows the comparative report, state projections, trajectory review flags, raw validated outputs, and handoff audit logs.
 
 ## Event generation engine contract
 
-The `lib/events` module defines the avatar baseline, event payload schema, pre-flight validator, deterministic option-event builder, consistency checker, and pure state projection/mutation logic. User-entered deltas and commitment changes produce `BASELINE_PRESERVING_OPTION` payloads for the 1-, 5-, and 10-year horizons. Each horizon creates a hypothetical projected state from the unchanged baseline. A `BASELINE_MUTATING_EVENT` payload is reserved for an explicitly described event with a stated cause; applying it advances the active state.
+The `lib/events` module defines the avatar baseline, event payload schema, pre-flight validator, option-event builder, consistency checker, and pure state projection/mutation logic. User-entered deltas and commitment changes produce `BASELINE_PRESERVING_OPTION` payloads for the 1-, 5-, and 10-year horizons. Each horizon creates a hypothetical projected state from the unchanged baseline. A `BASELINE_MUTATING_EVENT` payload is reserved for an explicitly described event with a stated cause; applying it advances the active state.
 
 State stats are integers from 0 to 100 and are clamped to that range after applying integer deltas from -20 to +20. Event payloads require an uppercase snake-case type, mutation tag, delta justification, horizon, description, proposed effects, and new/ended commitment lists. `validate_payload` returns an empty list for valid payloads or path-qualified validation errors; generated payloads are schema-validated before being returned.
 
-The app collects an editable shared state and user-supplied scenario assumptions and passes them through the projection pipeline. A rejected event gets one bounded correction attempt, then uses a safe unchanged-state fallback with an audit flag. The app does not call an LLM: event effects and specialist perspectives are deterministic and user-directed, not model-generated.
+The app collects an editable shared state and user-supplied scenario assumptions and passes them through the projection pipeline. A rejected event gets one bounded correction attempt, then uses a safe unchanged-state fallback with an audit flag. The provider-neutral adapter defaults to deterministic mock mode. In live mode, a selected provider generates specialist analysis and event descriptions; event effects and commitments remain exactly the user-supplied assumptions. Provider failures fall back to deterministic outputs.
 
 ## Technology
 
 - Next.js 16 App Router and route handlers
 - React 19 and TypeScript
 - Zod runtime schemas for requests, results, and reports
+- Vercel AI SDK with OpenAI, Google Gemini, and Anthropic providers (optional live mode)
 - Vitest and Testing Library for automated tests
 - CSS in `app/globals.css`
 
-There is no live AI provider integration, database, or authentication in this MVP. The specialist outputs are deterministic templates.
+The app has no database or authentication. Live mode is opt-in and sends the decision prompt, option details, baseline state, and scenario assumptions to the configured model provider. Use mock mode for offline work or when those inputs should not leave the app server.
 
 ## Prerequisites and setup
 
@@ -55,7 +56,7 @@ Open <http://localhost:3000>. Keep the development server running in that termin
 
 ### Environment variables
 
-No environment variables are required for the current implementation. No API key is used. `.env.example` records that no variables are required; do not add real credentials to the repository.
+Mock mode requires no environment variables and is the default. For live mode, copy `.env.example` into `.env.local`, set `LLM_PROVIDER` to `openai`, `gemini`, or `anthropic`, and add the matching provider API key. The Anthropic integration requires an Anthropic API key accepted by its Messages API; a Claude Code session token or key from another service may not work. Optional model overrides are also listed there. Never commit real credentials.
 
 ## Commands
 

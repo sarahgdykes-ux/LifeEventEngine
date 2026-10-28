@@ -2,6 +2,7 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentResult } from "@/lib/agents/live-agent";
 
 export class PessimistAgent implements SpecialistAgent {
   readonly name = "pessimist" as const;
@@ -9,7 +10,7 @@ export class PessimistAgent implements SpecialistAgent {
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
     const context = describeDecisionContext(decision, option);
 
-    return {
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
@@ -38,5 +39,6 @@ export class PessimistAgent implements SpecialistAgent {
       },
       status: "complete",
     };
+    return useLiveAgentResult(this.name, decision, option, fallback);
   }
 }

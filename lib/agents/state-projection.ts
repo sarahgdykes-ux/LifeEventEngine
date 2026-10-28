@@ -46,24 +46,36 @@ function safeFallback(event: EventPayload, reasons: readonly string[]): EventPay
 export async function projectDecisionState(decision: DecisionInput): Promise<DecisionStateProjection | undefined> {
   if (!decision.baselineState || !decision.scenarioEffects) return undefined;
   const baseline = AvatarStateSchema.parse(decision.baselineState);
-  const generated = eventGenerator.generateOptions(decision, baseline);
-
-  const options = await Promise.all(generated.map(async ({ optionId, events }) => {
+  const options = await Promise.all(decision.options.map(async (option) => {
+    const { id: optionId } = option;
     const history: EventPayload[] = [];
     const corrections: Partial<Record<StateHorizon, string[]>> = {};
     const checkedEvents = {} as Record<StateHorizon, EventPayload>;
 
     for (const horizon of STATE_HORIZONS) {
-      const proposed = events[horizon];
       try {
         checkedEvents[horizon] = await eventGenerator.generateChecked<EventPayload>(async (reasons) => {
+          const proposed = await eventGenerator.generateOptionEvent(
+            decision,
+            option,
+            baseline,
+            HORIZON_YEARS[horizon],
+            reasons,
+          );
           if (!reasons) return proposed;
           corrections[horizon] = [...reasons];
-          return safeFallback(proposed, reasons);
+          return proposed;
         }, baseline, history);
       } catch (error) {
         const reasons = error instanceof Error ? [error.message] : ["Consistency Checker rejected the event."];
         corrections[horizon] = reasons;
+        const proposed = await eventGenerator.generateOptionEvent(
+          decision,
+          option,
+          baseline,
+          HORIZON_YEARS[horizon],
+          reasons,
+        );
         checkedEvents[horizon] = safeFallback(proposed, reasons);
       }
       history.push(checkedEvents[horizon]);
