@@ -82,8 +82,7 @@ export function getLLMProvider(): LLMProvider {
     : "mock";
 }
 
-export function isLiveLLMConfigured(): boolean {
-  const provider = getLLMProvider();
+export function isLiveLLMConfigured(provider = getLLMProvider()): boolean {
   return (provider === "openai" && Boolean(process.env.OPENAI_API_KEY))
     || (provider === "gemini" && Boolean(process.env.GEMINI_API_KEY))
     || (provider === "anthropic" && Boolean(process.env.ANTHROPIC_API_KEY));
@@ -93,15 +92,16 @@ export async function generateStructuredAgentOutput<T>({
   prompt,
   schema,
   systemPrompt,
+  provider = getLLMProvider(),
   maxRetries = DEFAULT_OUTPUT_RETRIES,
 }: {
   prompt: string;
   schema: z.ZodType<T>;
   systemPrompt: string;
+  provider?: LLMProvider;
   maxRetries?: number;
-}): Promise<T | undefined> {
-  const provider = getLLMProvider();
-  if (provider === "mock" || !isLiveLLMConfigured()) return undefined;
+}): Promise<StructuredOutputResult<T> | undefined> {
+  if (provider === "mock" || !isLiveLLMConfigured(provider)) return undefined;
 
   if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > MAX_OUTPUT_RETRIES) {
     throw new RangeError(`maxRetries must be an integer between 0 and ${MAX_OUTPUT_RETRIES}`);
@@ -128,5 +128,5 @@ export async function generateStructuredAgentOutput<T>({
       return output;
     },
   });
-  return result.data;
+  return result;
 }

@@ -28,7 +28,7 @@ export async function useLiveAgentResult(
     });
     if (!generated) return fallback;
     // Handoff identity is controlled by the orchestrator, not model output.
-    return AgentResultSchema.parse({ ...generated, agent: name, optionId: option.id });
+    return AgentResultSchema.parse({ ...generated.data, agent: name, optionId: option.id });
   } catch {
     // Provider/network failures retain the existing offline-capable result.
     return fallback;
