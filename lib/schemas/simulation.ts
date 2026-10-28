@@ -7,6 +7,8 @@ import {
   TIME_HORIZONS,
   type AgentName,
 } from "@/lib/agents/types";
+import { AvatarStateSchema } from "@/lib/events/state-schema";
+import { EventPayloadSchema } from "@/lib/events/event-schema";
 
 const RequiredTextSchema = z.string().trim().min(1, "Must not be empty");
 const TextListSchema = z.array(RequiredTextSchema).min(1, "Must contain at least one item");
@@ -178,6 +180,41 @@ export const MissingResultSchema = z.string().regex(
   "Must identify an agent-option pair",
 );
 
+export const HandoffAuditEntrySchema = z.object({
+  key: z.string().min(1),
+  stage: z.enum(["agent_output", "handoff", "narrator"]),
+  outcome: z.enum(["accepted", "rejected", "started"]),
+  detail: z.string().min(1),
+});
+
+const StateHorizonProjectionSchema = z.object({
+  event: EventPayloadSchema,
+  state: AvatarStateSchema,
+  executionSummary: RequiredTextSchema,
+  correctionReasons: z.array(RequiredTextSchema),
+});
+
+const OptionStateProjectionSchema = z.object({
+  optionId: OptionIdSchema,
+  horizons: z.object({
+    year1: StateHorizonProjectionSchema,
+    year5: StateHorizonProjectionSchema,
+    year10: StateHorizonProjectionSchema,
+  }),
+  trajectoryReview: z.object({
+    status: z.enum(["viable", "at_risk", "unwinnable"]),
+    flags: z.array(RequiredTextSchema),
+  }),
+});
+
+export const DecisionStateProjectionSchema = z.object({
+  baselineState: AvatarStateSchema,
+  options: z.array(OptionStateProjectionSchema).length(OPTION_IDS.length)
+    .refine((options) => new Set(options.map(({ optionId }) => optionId)).size === OPTION_IDS.length, {
+      message: "State projection must include options A and B exactly once",
+    }),
+});
+
 export const SimulationReportSchema = z
   .object({
     decisionId: RequiredTextSchema,
@@ -185,6 +222,8 @@ export const SimulationReportSchema = z
     synthesis: SimulationSynthesisSchema.nullable(),
     reportStatus: z.enum(["complete", "partial", "failed"]),
     missingResults: z.array(MissingResultSchema),
+    auditLog: z.array(HandoffAuditEntrySchema).optional(),
+    stateProjection: DecisionStateProjectionSchema.optional(),
   })
   .superRefine((report, context) => {
     const completeResultIds = new Set(

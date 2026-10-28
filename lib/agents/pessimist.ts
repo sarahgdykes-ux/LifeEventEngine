@@ -2,6 +2,7 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentResult } from "@/lib/agents/live-agent";
 
 export class PessimistAgent implements SpecialistAgent {
   readonly name = "pessimist" as const;
@@ -9,12 +10,13 @@ export class PessimistAgent implements SpecialistAgent {
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
     const context = describeDecisionContext(decision, option);
 
-    return {
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
         `Risk review for "${context.question}": for ${context.option}, test how a setback could interfere with the goals of ${context.goals}, especially the priorities of ${context.priorities}.`,
         `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`,
+        `Check the downside against the supplied starting state: ${context.baseline}`,
       ],
       assumptions: [
         `This is an illustrative downside scenario, not a verified fact or prediction; it assumes an unexpected obstacle could limit progress on ${context.goals}.`,
@@ -37,5 +39,6 @@ export class PessimistAgent implements SpecialistAgent {
       },
       status: "complete",
     };
+    return useLiveAgentResult(this.name, decision, option, fallback);
   }
 }

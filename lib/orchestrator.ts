@@ -7,6 +7,7 @@ import { WellbeingAgent } from "@/lib/agents/wellbeing";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, SimulationReport } from "@/lib/schemas/simulation";
 import { narrator, type Narrator } from "@/lib/narrator";
+import { deriveStateScores, projectDecisionState } from "@/lib/agents/state-projection";
 import {
   validateAgentResult,
   validateCompleteAgentHandoff,
@@ -30,6 +31,21 @@ export async function runSimulation(
   agents: readonly SpecialistAgent[] = SPECIALIST_AGENTS,
   narratorAgent: Narrator = narrator,
 ): Promise<SimulationReport> {
+  const auditLog: NonNullable<SimulationReport["auditLog"]> = [];
+  const stateProjection = await projectDecisionState(decision);
+  stateProjection?.options.forEach((option) => {
+    Object.entries(option.horizons).forEach(([horizon, projection]) => {
+      if (projection.correctionReasons.length > 0) {
+        auditLog.push({
+          key: `event:${option.optionId}:${horizon}`,
+          stage: "handoff",
+          outcome: "accepted",
+          detail: `Consistency Checker requested a safe unchanged-state retry: ${projection.correctionReasons.join("; ")}`,
+        });
+      }
+    });
+  });
+  const projectionsByOption = new Map(stateProjection?.options.map((projection) => [projection.optionId, projection]) ?? []);
   const candidates = await Promise.all(agents.flatMap((agent) => decision.options.map(async (option) => {
     const requestedKey = `${agent.name}:${option.id}`;
     let output: unknown;
@@ -37,6 +53,7 @@ export async function runSimulation(
     try {
       output = await agent.analyze(decision, option);
     } catch (error) {
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Agent execution failed." });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "agent_error",
@@ -49,6 +66,7 @@ export async function runSimulation(
     try {
       result = validateAgentResult(output);
     } catch {
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation." });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "invalid_output",
@@ -57,8 +75,21 @@ export async function runSimulation(
       return { matchesRequestedKey: false } satisfies AgentAttempt;
     }
 
+    const stateProjectionForOption = projectionsByOption.get(option.id);
+    if (stateProjectionForOption && stateProjection) {
+      const derivedScores = deriveStateScores(stateProjectionForOption, stateProjection.baselineState);
+      if (result.agent === "financial") {
+        result.scores.financialHealth = derivedScores.financialHealth;
+      } else if (result.agent === "wellbeing") {
+        result.scores.emotionalWellbeing = derivedScores.emotionalWellbeing;
+      } else if (result.agent === "pessimist") {
+        result.scores.riskLevel = derivedScores.riskLevel;
+      }
+    }
+
     const matchesRequestedKey = result.agent === agent.name && result.optionId === option.id;
     if (!matchesRequestedKey) {
+      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff." });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "key_mismatch",
@@ -66,6 +97,8 @@ export async function runSimulation(
       });
       return { result, matchesRequestedKey } satisfies AgentAttempt;
     }
+
+    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation." });
 
     console.info("Simulation agent output schema validated", {
       agent: result.agent,
@@ -119,6 +152,9 @@ export async function runSimulation(
       validatedResultCount: completeResults.length,
     });
     synthesis = narratorAgent.synthesize(completeResults, decision);
+    auditLog.push({ key: "narrator", stage: "narrator", outcome: "accepted", detail: "Complete validated handoff synthesized." });
+  } else {
+    auditLog.push({ key: "narrator", stage: "narrator", outcome: "rejected", detail: "Synthesis skipped because the specialist handoff was incomplete." });
   }
 
   return validateSimulationReport({
@@ -127,5 +163,7 @@ export async function runSimulation(
     synthesis,
     reportStatus,
     missingResults,
+    auditLog,
+    ...(stateProjection ? { stateProjection } : {}),
   });
 }

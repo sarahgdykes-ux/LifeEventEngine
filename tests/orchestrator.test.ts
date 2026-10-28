@@ -31,10 +31,11 @@ describe("runSimulation", () => {
     expect(report.synthesis.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
     expect(report.synthesis.options[0].timeline.year1).toHaveLength(4);
     expect(report.synthesis.options[0].breakdownScores).toEqual({
-      financialHealth: expect.objectContaining({ value: 50 }),
-      emotionalWellbeing: expect.objectContaining({ value: 50 }),
-      riskLevel: expect.objectContaining({ value: 50 }),
+      financialHealth: expect.objectContaining({ value: 53 }),
+      emotionalWellbeing: expect.objectContaining({ value: 68 }),
+      riskLevel: expect.objectContaining({ value: 4 }),
     });
+    expect(report.stateProjection?.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
     expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.question);
     expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.options[0].label);
     expect(SPECIALIST_AGENTS).toHaveLength(4);

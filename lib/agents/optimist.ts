@@ -1,16 +1,20 @@
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
+import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentResult } from "@/lib/agents/live-agent";
 
 export class OptimistAgent implements SpecialistAgent {
   readonly name = "optimist" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
-    return {
+    const context = describeDecisionContext(decision, option);
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
         `Illustrative possibility: ${option.label} could create useful opportunities to pursue the decision's goals. This is a reflection prompt, not a factual prediction.`,
+        `Use the shared starting-state assumptions as a progress baseline: ${context.baseline}`,
       ],
       assumptions: [
         `This scenario assumes the person can make a sustained effort toward ${option.label.toLowerCase()} while adapting as circumstances change.`,
@@ -27,5 +31,6 @@ export class OptimistAgent implements SpecialistAgent {
       scores: {},
       status: "complete",
     };
+    return useLiveAgentResult(this.name, decision, option, fallback);
   }
 }
