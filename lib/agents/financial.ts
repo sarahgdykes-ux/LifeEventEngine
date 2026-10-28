@@ -2,12 +2,16 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
-import { useLiveAgentResult } from "@/lib/agents/live-agent";
+import { useLiveAgentExecution } from "@/lib/agents/live-agent";
 
 export class FinancialAgent implements SpecialistAgent {
   readonly name = "financial" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    return (await this.analyzeWithMetadata(decision, option)).result;
+  }
+
+  async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
 
     const fallback: AgentResult = {
@@ -39,6 +43,6 @@ export class FinancialAgent implements SpecialistAgent {
       },
       status: "complete",
     };
-    return useLiveAgentResult(this.name, decision, option, fallback);
+    return useLiveAgentExecution(this.name, decision, option, fallback);
   }
 }

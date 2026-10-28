@@ -176,7 +176,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .audit-tabs button { border: 1px solid var(--line); border-radius: 3px; padding: 6px 9px; background: white; color: var(--ink); cursor: pointer; }
 .audit-tabs button[aria-selected="true"] { border-color: var(--green); background: var(--green); color: white; }
 .audit-panel { max-height: 380px; overflow: auto; border: 1px solid var(--line); background: #fff; }
-.audit-panel pre { margin: 0; padding: 11px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.audit-result-card + .audit-result-card { border-top: 1px solid var(--line); }
+.audit-result-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 11px 0; font-size: 11px; }
+.retry-badge { flex: 0 0 auto; border: 1px solid; border-radius: 999px; padding: 2px 7px; font-size: 10px; font-weight: 650; }
+.retry-badge-clean { border-color: #9bc9a5; background: #e8f5e9; color: #226332; }
+.retry-badge-used { border-color: #e5bd69; background: #fff4d6; color: #805600; }
+.audit-panel pre { margin: 0; padding: 8px 11px 11px; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .developer-audit h4 { margin: 14px 0 6px; }
 .audit-log { display: grid; gap: 5px; padding-left: 20px; font-size: 11px; }
 .audit-log li code { margin-right: 7px; color: var(--green); }

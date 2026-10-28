@@ -10,12 +10,17 @@ const ROLE_GUIDANCE: Record<AgentName, string> = {
   wellbeing: "Focus on stress, relationships, health, daily routine, and fulfillment. Do not diagnose or make clinical claims.",
 };
 
-export async function useLiveAgentResult(
+export interface LiveAgentExecution {
+  result: AgentResult;
+  retriesUsed: number;
+}
+
+export async function useLiveAgentExecution(
   name: AgentName,
   decision: DecisionInput,
   option: DecisionOption,
   fallback: AgentResult,
-): Promise<AgentResult> {
+): Promise<LiveAgentExecution> {
   try {
     const generated = await generateStructuredAgentOutput({
       schema: AgentResultSchema,
@@ -26,11 +31,23 @@ export async function useLiveAgentResult(
       ].join(" "),
       prompt: JSON.stringify({ agent: name, optionId: option.id, decision, option }),
     });
-    if (!generated) return fallback;
+    if (!generated) return { result: fallback, retriesUsed: 0 };
     // Handoff identity is controlled by the orchestrator, not model output.
-    return AgentResultSchema.parse({ ...generated.data, agent: name, optionId: option.id });
+    return {
+      result: AgentResultSchema.parse({ ...generated.data, agent: name, optionId: option.id }),
+      retriesUsed: generated.retriesUsed,
+    };
   } catch {
     // Provider/network failures retain the existing offline-capable result.
-    return fallback;
+    return { result: fallback, retriesUsed: 0 };
   }
+}
+
+export async function useLiveAgentResult(
+  name: AgentName,
+  decision: DecisionInput,
+  option: DecisionOption,
+  fallback: AgentResult,
+): Promise<AgentResult> {
+  return (await useLiveAgentExecution(name, decision, option, fallback)).result;
 }

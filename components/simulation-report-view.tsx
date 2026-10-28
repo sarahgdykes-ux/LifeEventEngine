@@ -156,6 +156,26 @@ function MissingResultCard({ agent, optionId }: { agent: AgentName; optionId: Op
   );
 }
 
+function AuditResultCard({
+  result,
+  retriesUsed,
+}: {
+  result: AgentResult;
+  retriesUsed: number;
+}) {
+  return (
+    <article className="audit-result-card">
+      <div className="audit-result-heading">
+        <strong>{AGENT_LABELS[result.agent]} · Option {result.optionId}</strong>
+        <span className={`retry-badge${retriesUsed > 0 ? " retry-badge-used" : " retry-badge-clean"}`}>
+          {retriesUsed > 0 ? `${retriesUsed} ${retriesUsed === 1 ? "retry" : "retries"} required` : "0 retries (clean)"}
+        </span>
+      </div>
+      <pre>{JSON.stringify(result, null, 2)}</pre>
+    </article>
+  );
+}
+
 function OptionPerspective({
   option,
   results,
@@ -317,7 +337,16 @@ export default function SimulationReportView({ report, decision }: SimulationRep
           ))}
         </div>
         <section aria-labelledby={`audit-tab-${auditAgent}`} className="audit-panel" role="tabpanel">
-          <pre>{JSON.stringify(report.results.filter(({ agent }) => agent === auditAgent), null, 2)}</pre>
+          {report.results.filter(({ agent }) => agent === auditAgent).map((result) => {
+            const handoff = report.auditLog?.find((entry) => entry.key === `${result.agent}:${result.optionId}`);
+            return (
+              <AuditResultCard
+                key={result.optionId}
+                result={result}
+                retriesUsed={handoff?.retriesUsed ?? 0}
+              />
+            );
+          })}
         </section>
         <h4>Handoff audit log</h4>
         {report.auditLog?.length ? (
