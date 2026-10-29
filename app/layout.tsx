@@ -4,7 +4,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Life Decision Simulator",
-  description: "A foundation for exploring possible life-decision scenarios.",
+  description: "Compare two life paths with structured reflection prompts. Explore possibilities—not predictions.",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

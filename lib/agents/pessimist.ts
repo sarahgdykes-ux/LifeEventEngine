@@ -13,12 +13,16 @@ export class PessimistAgent implements SpecialistAgent {
 
   async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
+    const hasConstraints = context.constraints !== "No specific constraints supplied";
 
     const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
         `Risk review for "${context.question}": for ${context.option}, test how a setback could interfere with the goals of ${context.goals}, especially the priorities of ${context.priorities}.`,
+        hasConstraints
+          ? `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`
+          : `Identify an early warning sign and a reversible fallback if the option becomes difficult to sustain.`,
         `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`,
         `Check the downside against the supplied starting state: ${context.baseline}`,
       ],
@@ -27,11 +31,15 @@ export class PessimistAgent implements SpecialistAgent {
       ],
       confidence: 40,
       uncertainties: [
-        `The probability and impact of any specific setback cannot be estimated from the information provided; details about ${context.constraints} may change the risk review.`,
+        hasConstraints
+          ? `The probability and impact of any specific setback cannot be estimated from the information provided; details about ${context.constraints} may change the risk review.`
+          : `The probability and impact of any specific setback cannot be estimated from the information provided.`,
         `The decision context does not establish how much risk the user is willing to accept in pursuing ${context.priorities}.`,
       ],
       projections: {
-        year1: `Illustrative check, not a forecast: monitor early setbacks to ${context.option} that could conflict with ${context.constraints}, and decide what would trigger a pause or fallback.`,
+        year1: hasConstraints
+          ? `Illustrative check, not a forecast: monitor early setbacks to ${context.option} that could conflict with ${context.constraints}, and decide what would trigger a pause or fallback.`
+          : `Illustrative check, not a forecast: monitor early setbacks to ${context.option} and decide what would trigger a pause or fallback.`,
         year5: `Illustrative check, not a forecast: revisit whether the demands of ${context.option} still leave room for ${context.goals} and the priority of ${context.priorities}.`,
         year10: `Illustrative check, not a forecast: retain flexibility because future responsibilities and circumstances related to "${context.question}" are unknown.`,
       },

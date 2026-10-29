@@ -66,11 +66,6 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const report = validateSimulationReport(await runSimulation(validation.data));
-    console.info("Simulation request completed", {
-      decisionId: report.decisionId,
-      reportStatus: report.reportStatus,
-      validatedResultCount: report.results.length,
-    });
     return Response.json(report, { status: 200 });
   } catch (error) {
     console.error("Simulation request failed", {

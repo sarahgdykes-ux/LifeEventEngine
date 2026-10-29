@@ -41,6 +41,9 @@ export const DecisionInputSchema = z.object({
     })
     .refine(([first, second]) => [first.id, second.id].includes("A") && [first.id, second.id].includes("B"), {
       message: "Options must include IDs A and B",
+    })
+    .refine(([first, second]) => first.label !== second.label, {
+      message: "Option labels must be different",
     }),
   goals: NonEmptyTextListSchema,
   priorities: NonEmptyTextListSchema,

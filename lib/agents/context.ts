@@ -7,7 +7,7 @@ export function describeDecisionContext(decision: DecisionInput, option: Decisio
 
   return {
     question: decision.question,
-    option: option.description ? `${option.label}: ${option.description}` : option.label,
+    option: option.label,
     goals: decision.goals.join("; "),
     priorities: decision.priorities.join("; "),
     constraints: constraints.length > 0 ? constraints.join("; ") : "No specific constraints supplied",
