@@ -131,6 +131,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .report-question { margin: 14px 0; font: 400 23px/1.2 Georgia, "Times New Roman", serif; overflow-wrap: anywhere; }
 .report-status-explanation { margin: 10px 0 15px; padding: 11px 13px; border-left: 3px solid #bb8c47; color: #654f28; background: #fbf4e5; font-size: 12px; }
 .report-status-complete-explanation { border-left-color: var(--green); color: var(--green-deep); background: var(--green-soft); }
+.report-export { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 14px 0; padding: 11px 12px; border: 1px solid var(--line); background: #f8faf7; }
+.report-export h3 { margin: 0; font: 400 16px/1.25 Georgia, "Times New Roman", serif; }
+.report-export p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
+.report-export-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.report-export-actions button { border: 1px solid var(--green); border-radius: 4px; padding: 7px 10px; background: white; color: var(--green); font: inherit; font-size: 11px; font-weight: 650; cursor: pointer; }
+.report-export-actions button:hover { background: #edf4ed; }
+.report-export .report-export-message { flex-basis: 100%; margin: 0; }
 .report-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .report-options > p { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
 .report-options strong { display: block; }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AGENT_NAMES, OPTION_IDS, type AgentName, type OptionId } from "@/lib/agents/types";
+import { createTimelineExportData, downloadJSONReport, generateMarkdownReport } from "@/lib/export";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, OptionSynthesis, SimulationReport } from "@/lib/schemas/simulation";
 
@@ -204,6 +205,16 @@ function OptionPerspective({
 
 export default function SimulationReportView({ report, decision }: SimulationReportViewProps) {
   const [auditAgent, setAuditAgent] = useState<AgentName>("optimist");
+  const [exportMessage, setExportMessage] = useState("");
+  const exportData = useMemo(() => createTimelineExportData(decision, report), [decision, report]);
+  const copyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(generateMarkdownReport(exportData));
+      setExportMessage("Markdown report copied to clipboard.");
+    } catch {
+      setExportMessage("Could not access the clipboard. Check browser permissions and try again.");
+    }
+  };
   const missingResultDetails = report.missingResults.map((key) => {
     const [agentKey, optionKey] = key.split(":");
     const agent = AGENT_NAMES.find((candidate) => candidate === agentKey);
@@ -235,6 +246,20 @@ export default function SimulationReportView({ report, decision }: SimulationRep
           No specialist returned a complete result. Any returned details are shown below; missing perspectives have not been filled in.
         </p>
       )}
+
+      <section className="report-export" aria-label="Export report">
+        <div>
+          <h3>Export report</h3>
+          <p>Download the full simulation as JSON or copy a formatted Markdown summary.</p>
+        </div>
+        <div className="report-export-actions">
+          <button type="button" onClick={() => downloadJSONReport(exportData, `life-decision-report-${report.decisionId}.json`)}>
+            Download JSON
+          </button>
+          <button type="button" onClick={copyMarkdown}>Copy Markdown report</button>
+        </div>
+        {exportMessage && <p className="report-export-message" role="status">{exportMessage}</p>}
+      </section>
 
       {report.stateProjection && (
         <section className="state-projection-report" aria-labelledby="state-projection-title">

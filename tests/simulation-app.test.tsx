@@ -159,6 +159,24 @@ describe("SimulationApp", () => {
     expect(screen.getByText("0 retries (clean)")).toBeTruthy();
   });
 
+  it("copies a formatted Markdown report from the export controls", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(completeReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy Markdown report" }));
+
+    expect(await screen.findByText("Markdown report copied to clipboard.")).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("# Life Decision Simulator Report"));
+  });
+
   it("shows partial reports and identifies every missing result without filling gaps", async () => {
     const partialReport = makePartialReport();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(partialReport)));
