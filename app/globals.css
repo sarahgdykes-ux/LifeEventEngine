@@ -406,6 +406,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
 .missing-result-card p { margin: 7px 0; font-size: 11px; }
 .missing-result-card code { font-size: 11px; }
 .missing-result-card code { font-size: 11px; }
+.audit-result-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.source-badge { padding: 3px 7px; border-radius: 999px; font: 700 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.source-badge-live_provider { color: #14532d; background: #dcfce7; }
+.source-badge-deterministic_fallback { color: #78350f; background: #fef3c7; }
 .missing-notice { margin-top: 16px; padding: 15px; border-left: 3px solid var(--coral); background: var(--coral-soft); }
 .missing-notice h3 { margin: 0; font-size: 13px; }
 .missing-notice > p { margin: 4px 0 11px; color: #754a3e; font-size: 12px; }

@@ -1,10 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { SPECIALIST_AGENTS, runSimulation } from "@/lib/orchestrator";
 import { narrator, type Narrator } from "@/lib/narrator";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import { SimulationReportSchema } from "@/lib/schemas/simulation";
 import { sampleDecision } from "@/tests/fixtures/decision";
+
+beforeEach(() => vi.stubEnv("LLM_PROVIDER", "mock"));
+afterEach(() => vi.unstubAllEnvs());
 
 describe("runSimulation", () => {
   it("runs all four agents for both options and returns a synthesized complete report", async () => {
@@ -25,6 +28,7 @@ describe("runSimulation", () => {
       "wellbeing:B",
     ]);
     expect(report.results.every((result) => result.status === "complete")).toBe(true);
+    expect(report.auditLog?.filter(({ stage }) => stage === "agent_output").every(({ source }) => source === "deterministic_fallback")).toBe(true);
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
     expect(report.missingResults).toEqual([]);
     if (!report.synthesis) throw new Error("Expected complete report synthesis");
@@ -66,6 +70,7 @@ describe("runSimulation", () => {
       analyzeWithMetadata: async (decision, option) => ({
         result: await agent.analyze(decision, option),
         retriesUsed: agent.name === "optimist" && option.id === "A" ? 2 : 0,
+        source: agent.name === "optimist" && option.id === "A" ? "live_provider" : "deterministic_fallback",
       }),
     }));
 
@@ -73,6 +78,8 @@ describe("runSimulation", () => {
 
     expect(report.auditLog?.find(({ key }) => key === "optimist:A")?.retriesUsed).toBe(2);
     expect(report.auditLog?.find(({ key }) => key === "optimist:B")?.retriesUsed).toBe(0);
+    expect(report.auditLog?.find(({ key }) => key === "optimist:A")?.source).toBe("live_provider");
+    expect(report.auditLog?.find(({ key }) => key === "optimist:B")?.source).toBe("deterministic_fallback");
     expect(SimulationReportSchema.safeParse(report).success).toBe(true);
   });
 

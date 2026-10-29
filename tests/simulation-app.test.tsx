@@ -82,6 +82,7 @@ function makeFailedReport(): SimulationReport {
 }
 
 beforeAll(async () => {
+  vi.stubEnv("LLM_PROVIDER", "mock");
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   completeReport = await runSimulation(sampleDecision);
 });
@@ -93,6 +94,7 @@ afterEach(() => {
 });
 
 afterAll(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -146,8 +148,8 @@ describe("SimulationApp", () => {
       ...completeReport,
       auditLog: completeReport.auditLog?.map((entry) => ({
         ...entry,
-        ...(entry.key === "optimist:A" ? { retriesUsed: 2 } : {}),
-        ...(entry.key === "optimist:B" ? { retriesUsed: 0 } : {}),
+        ...(entry.key === "optimist:A" ? { retriesUsed: 2, source: "live_provider" as const } : {}),
+        ...(entry.key === "optimist:B" ? { retriesUsed: 0, source: "deterministic_fallback" as const } : {}),
       })),
     });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(retryReport)));
@@ -160,6 +162,8 @@ describe("SimulationApp", () => {
 
     expect(screen.getByText("2 retries required")).toBeTruthy();
     expect(screen.getByText("0 retries (clean)")).toBeTruthy();
+    expect(screen.getByText("live_provider")).toBeTruthy();
+    expect(screen.getByText("deterministic_fallback")).toBeTruthy();
   });
 
   it("copies a formatted Markdown report from the export controls", async () => {

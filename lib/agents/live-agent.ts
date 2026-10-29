@@ -1,4 +1,4 @@
-import type { AgentName, SpecialistAgent } from "@/lib/agents/types";
+import type { AgentExecutionSource, AgentName, SpecialistAgent } from "@/lib/agents/types";
 import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import { AgentResultSchema, type AgentResult } from "@/lib/schemas/simulation";
 import { generateStructuredAgentOutput } from "@/lib/llm/adapter";
@@ -13,6 +13,7 @@ const ROLE_GUIDANCE: Record<AgentName, string> = {
 export interface LiveAgentExecution {
   result: AgentResult;
   retriesUsed: number;
+  source: AgentExecutionSource;
 }
 
 export async function useLiveAgentExecution(
@@ -31,15 +32,16 @@ export async function useLiveAgentExecution(
       ].join(" "),
       prompt: JSON.stringify({ agent: name, optionId: option.id, decision, option }),
     });
-    if (!generated) return { result: fallback, retriesUsed: 0 };
+    if (!generated) return { result: fallback, retriesUsed: 0, source: "deterministic_fallback" };
     // Handoff identity is controlled by the orchestrator, not model output.
     return {
       result: AgentResultSchema.parse({ ...generated.data, agent: name, optionId: option.id }),
       retriesUsed: generated.retriesUsed,
+      source: "live_provider",
     };
   } catch {
     // Provider/network failures retain the existing offline-capable result.
-    return { result: fallback, retriesUsed: 0 };
+    return { result: fallback, retriesUsed: 0, source: "deterministic_fallback" };
   }
 }
 
