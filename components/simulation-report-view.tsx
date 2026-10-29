@@ -1,5 +1,8 @@
-import { useState } from "react";
+"use client";
+
+import { useMemo, useState } from "react";
 import { AGENT_NAMES, OPTION_IDS, type AgentName, type OptionId } from "@/lib/agents/types";
+import { createTimelineExportData, downloadJSONReport, generateMarkdownReport } from "@/lib/export";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, OptionSynthesis, SimulationReport } from "@/lib/schemas/simulation";
 
@@ -72,6 +75,7 @@ const HORIZONS = [
   ["year5", "Year 5"],
   ["year10", "Year 10"],
 ] as const;
+const STATE_STATS = ["finances", "wellbeing", "health", "career"] as const;
 
 const TRADEOFF_LABELS = {
   financial: "Financial",
@@ -402,6 +406,26 @@ function MissingResultCard({ agent, optionId }: { agent: AgentName; optionId: Op
   );
 }
 
+function AuditResultCard({
+  result,
+  retriesUsed,
+}: {
+  result: AgentResult;
+  retriesUsed: number;
+}) {
+  return (
+    <article className="audit-result-card">
+      <div className="audit-result-heading">
+        <strong>{AGENT_LABELS[result.agent]} · Option {result.optionId}</strong>
+        <span className={`retry-badge${retriesUsed > 0 ? " retry-badge-used" : " retry-badge-clean"}`}>
+          {retriesUsed > 0 ? `${retriesUsed} ${retriesUsed === 1 ? "retry" : "retries"} required` : "0 retries (clean)"}
+        </span>
+      </div>
+      <pre>{JSON.stringify(result, null, 2)}</pre>
+    </article>
+  );
+}
+
 function OptionPerspective({
   option,
   results,
@@ -435,6 +459,17 @@ function OptionPerspective({
 }
 
 export default function SimulationReportView({ report, decision }: SimulationReportViewProps) {
+  const [auditAgent, setAuditAgent] = useState<AgentName>("optimist");
+  const [exportMessage, setExportMessage] = useState("");
+  const exportData = useMemo(() => createTimelineExportData(decision, report), [decision, report]);
+  const copyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(generateMarkdownReport(exportData));
+      setExportMessage("Markdown report copied to clipboard.");
+    } catch {
+      setExportMessage("Could not access the clipboard. Check browser permissions and try again.");
+    }
+  };
   const missingResultDetails = report.missingResults.map((key) => {
     const [agentKey, optionKey] = key.split(":");
     const agent = AGENT_NAMES.find((candidate) => candidate === agentKey);
@@ -465,6 +500,59 @@ export default function SimulationReportView({ report, decision }: SimulationRep
         <p className="report-status-explanation">
           No specialist returned a complete result. Any returned details are shown below; missing perspectives have not been filled in.
         </p>
+      )}
+
+      <section className="report-export" aria-label="Export report">
+        <div>
+          <h3>Export report</h3>
+          <p>Download the full simulation as JSON or copy a formatted Markdown summary.</p>
+        </div>
+        <div className="report-export-actions">
+          <button type="button" onClick={() => downloadJSONReport(exportData, `life-decision-report-${report.decisionId}.json`)}>
+            Download JSON
+          </button>
+          <button type="button" onClick={copyMarkdown}>Copy Markdown report</button>
+        </div>
+        {exportMessage && <p className="report-export-message" role="status">{exportMessage}</p>}
+      </section>
+
+      {report.stateProjection && (
+        <section className="state-projection-report" aria-labelledby="state-projection-title">
+          <h3 id="state-projection-title">State projections from your assumptions</h3>
+          <p>Each horizon is projected independently from the same baseline. The entered deltas are scenario assumptions, not predictions.</p>
+          <div className="state-projection-options">
+            {report.stateProjection.options.map((optionProjection) => {
+              const option = decision.options.find(({ id }) => id === optionProjection.optionId);
+              if (!option) return null;
+              return (
+                <section className="state-projection-option" key={optionProjection.optionId}>
+                  <h4>Option {optionProjection.optionId}: {option.label}</h4>
+                  <div className="state-projection-horizons">
+                    {HORIZONS.map(([horizon, label]) => {
+                      const projection = optionProjection.horizons[horizon];
+                      return (
+                        <article key={horizon}>
+                          <h5>{label} · Age {projection.state.character.age} · {projection.state.year}</h5>
+                          <dl>{STATE_STATS.map((stat) => (
+                            <div key={stat}><dt>{stat}</dt><dd>{projection.state.stats[stat]}</dd></div>
+                          ))}</dl>
+                          <p>{projection.executionSummary}</p>
+                          {projection.correctionReasons.length > 0 && <p className="trajectory-warning">Safe fallback used: {projection.correctionReasons.join("; ")}</p>}
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <p className={`trajectory-status trajectory-status-${optionProjection.trajectoryReview.status}`}>
+                    Trajectory review: {optionProjection.trajectoryReview.status.replace("_", " ")}
+                  </p>
+                  {optionProjection.trajectoryReview.flags.length > 0 && (
+                    <ul>{optionProjection.trajectoryReview.flags.map((flag) => <li key={flag}>{flag}</li>)}</ul>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {report.synthesis && (
@@ -540,6 +628,41 @@ export default function SimulationReportView({ report, decision }: SimulationRep
           })}
         </div>
       </section>
+
+      <details className="developer-audit">
+        <summary>Developer audit view</summary>
+        <p>Validated handoff records and raw structured outputs returned by each specialist.</p>
+        <div className="audit-tabs" role="tablist" aria-label="Raw agent outputs">
+          {AGENT_NAMES.map((agent) => (
+            <button
+              aria-selected={auditAgent === agent}
+              id={`audit-tab-${agent}`}
+              key={agent}
+              onClick={() => setAuditAgent(agent)}
+              role="tab"
+              type="button"
+            >{AGENT_LABELS[agent]}</button>
+          ))}
+        </div>
+        <section aria-labelledby={`audit-tab-${auditAgent}`} className="audit-panel" role="tabpanel">
+          {report.results.filter(({ agent }) => agent === auditAgent).map((result) => {
+            const handoff = report.auditLog?.find((entry) => entry.key === `${result.agent}:${result.optionId}`);
+            return (
+              <AuditResultCard
+                key={result.optionId}
+                result={result}
+                retriesUsed={handoff?.retriesUsed ?? 0}
+              />
+            );
+          })}
+        </section>
+        <h4>Handoff audit log</h4>
+        {report.auditLog?.length ? (
+          <ol className="audit-log">{report.auditLog.map((entry, index) => (
+            <li key={`${entry.key}-${index}`}><code>{entry.stage} · {entry.outcome} · {entry.key}</code><span>{entry.detail}</span></li>
+          ))}</ol>
+        ) : <p>No handoff audit records were included in this report.</p>}
+      </details>
 
       <p className="report-disclaimer">Use these perspectives as prompts for reflection, not as predictions or recommendations.</p>
     </div>

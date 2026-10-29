@@ -138,6 +138,45 @@ describe("SimulationApp", () => {
     expect(screen.getAllByText("Option A does not improve financial stability.").length).toBeGreaterThan(0);
   });
 
+  it("shows clean and recovered retry badges in the developer audit view", async () => {
+    const retryReport = SimulationReportSchema.parse({
+      ...completeReport,
+      auditLog: completeReport.auditLog?.map((entry) => ({
+        ...entry,
+        ...(entry.key === "optimist:A" ? { retriesUsed: 2 } : {}),
+        ...(entry.key === "optimist:B" ? { retriesUsed: 0 } : {}),
+      })),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(retryReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    fireEvent.click(screen.getByText("Developer audit view"));
+
+    expect(screen.getByText("2 retries required")).toBeTruthy();
+    expect(screen.getByText("0 retries (clean)")).toBeTruthy();
+  });
+
+  it("copies a formatted Markdown report from the export controls", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(completeReport)));
+    render(<SimulationApp />);
+    fillDecisionForm();
+
+    fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
+    expect(await screen.findByText("Complete report")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Copy Markdown report" }));
+
+    expect(await screen.findByText("Markdown report copied to clipboard.")).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("# Life Decision Simulator Report"));
+  });
+
   it("shows partial reports and identifies every missing result without filling gaps", async () => {
     const partialReport = makePartialReport();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(partialReport)));

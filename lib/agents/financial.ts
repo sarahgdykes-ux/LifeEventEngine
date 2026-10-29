@@ -2,23 +2,27 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentExecution } from "@/lib/agents/live-agent";
 
 export class FinancialAgent implements SpecialistAgent {
   readonly name = "financial" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    return (await this.analyzeWithMetadata(decision, option)).result;
+  }
+
+  async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
     const hasConstraints = context.constraints !== "No specific constraints supplied";
     const hasConstraints = context.constraints !== "No specific constraints supplied";
 
-    return {
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
         `For "${context.question}", make a side-by-side budget for ${context.option} that includes income changes, one-time costs, recurring expenses, debt, and savings before judging its fit with ${context.goals}.`,
-        hasConstraints
-          ? `Check whether the budget protects the priority of ${context.priorities} while staying within the constraint(s): ${context.constraints}.`
-          : `Check whether the budget protects the priority of ${context.priorities}.`,
+        `Check whether the budget protects the priority of ${context.priorities} while staying within the constraint(s): ${context.constraints}.`,
+        `Use the supplied finances stat as a relative starting marker, not a cash balance: ${context.baseline}`,
       ],
       assumptions: [
         `No personal income, expense, debt, savings, or location-specific cost figures were supplied for ${context.option}; these prompts are illustrative and do not establish a financial outcome.`,
@@ -51,5 +55,6 @@ export class FinancialAgent implements SpecialistAgent {
       },
       status: "complete",
     };
+    return useLiveAgentExecution(this.name, decision, option, fallback);
   }
 }

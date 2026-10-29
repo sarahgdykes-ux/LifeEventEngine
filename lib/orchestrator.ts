@@ -7,6 +7,7 @@ import { WellbeingAgent } from "@/lib/agents/wellbeing";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, SimulationReport } from "@/lib/schemas/simulation";
 import { narrator, type Narrator } from "@/lib/narrator";
+import { deriveStateScores, projectDecisionState } from "@/lib/agents/state-projection";
 import {
   validateAgentResult,
   validateCompleteAgentHandoff,
@@ -23,6 +24,7 @@ export const SPECIALIST_AGENTS: readonly SpecialistAgent[] = [
 interface AgentAttempt {
   result?: AgentResult;
   matchesRequestedKey: boolean;
+  retriesUsed: number;
 }
 
 export async function runSimulation(
@@ -30,49 +32,88 @@ export async function runSimulation(
   agents: readonly SpecialistAgent[] = SPECIALIST_AGENTS,
   narratorAgent: Narrator = narrator,
 ): Promise<SimulationReport> {
+  const auditLog: NonNullable<SimulationReport["auditLog"]> = [];
+  const stateProjection = await projectDecisionState(decision);
+  stateProjection?.options.forEach((option) => {
+    Object.entries(option.horizons).forEach(([horizon, projection]) => {
+      if (projection.correctionReasons.length > 0) {
+        auditLog.push({
+          key: `event:${option.optionId}:${horizon}`,
+          stage: "handoff",
+          outcome: "accepted",
+          detail: `Consistency Checker requested a safe unchanged-state retry: ${projection.correctionReasons.join("; ")}`,
+        });
+      }
+    });
+  });
+  const projectionsByOption = new Map(stateProjection?.options.map((projection) => [projection.optionId, projection]) ?? []);
   const candidates = await Promise.all(agents.flatMap((agent) => decision.options.map(async (option) => {
     const requestedKey = `${agent.name}:${option.id}`;
     let output: unknown;
+    let retriesUsed = 0;
 
     try {
-      output = await agent.analyze(decision, option);
+      if (agent.analyzeWithMetadata) {
+        const execution = await agent.analyzeWithMetadata(decision, option);
+        output = execution.result;
+        retriesUsed = execution.retriesUsed;
+      } else {
+        output = await agent.analyze(decision, option);
+      }
     } catch (error) {
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Agent execution failed." });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "agent_error",
         schemaValid: false,
       });
-      return { matchesRequestedKey: false } satisfies AgentAttempt;
+      return { matchesRequestedKey: false, retriesUsed } satisfies AgentAttempt;
     }
 
     let result: AgentResult;
     try {
       result = validateAgentResult(output);
     } catch {
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation.", retriesUsed });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "invalid_output",
         schemaValid: false,
       });
-      return { matchesRequestedKey: false } satisfies AgentAttempt;
+      return { matchesRequestedKey: false, retriesUsed } satisfies AgentAttempt;
+    }
+
+    const stateProjectionForOption = projectionsByOption.get(option.id);
+    if (stateProjectionForOption && stateProjection) {
+      const derivedScores = deriveStateScores(stateProjectionForOption, stateProjection.baselineState);
+      if (result.agent === "financial") {
+        result.scores.financialHealth = derivedScores.financialHealth;
+      } else if (result.agent === "wellbeing") {
+        result.scores.emotionalWellbeing = derivedScores.emotionalWellbeing;
+      } else if (result.agent === "pessimist") {
+        result.scores.riskLevel = derivedScores.riskLevel;
+      }
     }
 
     const matchesRequestedKey = result.agent === agent.name && result.optionId === option.id;
     if (!matchesRequestedKey) {
+      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff.", retriesUsed });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "key_mismatch",
         schemaValid: true,
       });
-      return { result, matchesRequestedKey } satisfies AgentAttempt;
+      return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
     }
+
+    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation.", retriesUsed });
 
     console.info("Simulation agent output schema validated", {
       agent: result.agent,
       optionId: result.optionId,
       schemaValid: true,
     });
-    return { result, matchesRequestedKey } satisfies AgentAttempt;
+    return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
   })));
 
   const attemptsByResultKey = new Map<string, AgentAttempt[]>();
@@ -119,6 +160,9 @@ export async function runSimulation(
       validatedResultCount: completeResults.length,
     });
     synthesis = narratorAgent.synthesize(completeResults, decision);
+    auditLog.push({ key: "narrator", stage: "narrator", outcome: "accepted", detail: "Complete validated handoff synthesized." });
+  } else {
+    auditLog.push({ key: "narrator", stage: "narrator", outcome: "rejected", detail: "Synthesis skipped because the specialist handoff was incomplete." });
   }
 
   return validateSimulationReport({
@@ -127,5 +171,7 @@ export async function runSimulation(
     synthesis,
     reportStatus,
     missingResults,
+    auditLog,
+    ...(stateProjection ? { stateProjection } : {}),
   });
 }

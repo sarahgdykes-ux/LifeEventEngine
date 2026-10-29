@@ -2,15 +2,20 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentExecution } from "@/lib/agents/live-agent";
 
 export class WellbeingAgent implements SpecialistAgent {
   readonly name = "wellbeing" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    return (await this.analyzeWithMetadata(decision, option)).result;
+  }
+
+  async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
     const hasConstraints = context.constraints !== "No specific constraints supplied";
 
-    return {
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
@@ -18,6 +23,8 @@ export class WellbeingAgent implements SpecialistAgent {
         hasConstraints
           ? `Explore likely effects to monitor in stress, relationships, health, and routine, especially where the constraint(s) ${context.constraints} might add pressure.`
           : `Explore likely effects to monitor in stress, relationships, health, and routine.`,
+        `Explore likely effects to monitor in stress, relationships, health, and routine, especially where the constraint(s) ${context.constraints} might add pressure.`,
+        `Compare any assumed wellbeing changes with the user-supplied starting point: ${context.baseline}`,
       ],
       assumptions: [
         `This is a reflection scenario, not a clinical assessment or prediction; it assumes the user can notice how ${context.option} affects daily life and adjust where possible.`,
@@ -42,5 +49,6 @@ export class WellbeingAgent implements SpecialistAgent {
       },
       status: "complete",
     };
+    return useLiveAgentExecution(this.name, decision, option, fallback);
   }
 }

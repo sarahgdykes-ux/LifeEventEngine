@@ -2,15 +2,20 @@ import type { DecisionInput, DecisionOption } from "@/lib/schemas/decision";
 import type { AgentResult } from "@/lib/schemas/simulation";
 import type { SpecialistAgent } from "@/lib/agents/types";
 import { describeDecisionContext } from "@/lib/agents/context";
+import { useLiveAgentExecution } from "@/lib/agents/live-agent";
 
 export class PessimistAgent implements SpecialistAgent {
   readonly name = "pessimist" as const;
 
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
+    return (await this.analyzeWithMetadata(decision, option)).result;
+  }
+
+  async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
     const hasConstraints = context.constraints !== "No specific constraints supplied";
 
-    return {
+    const fallback: AgentResult = {
       agent: this.name,
       optionId: option.id,
       findings: [
@@ -18,6 +23,8 @@ export class PessimistAgent implements SpecialistAgent {
         hasConstraints
           ? `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`
           : `Identify an early warning sign and a reversible fallback if the option becomes difficult to sustain.`,
+        `Check whether the constraints (${context.constraints}) could make the option difficult to sustain, and identify an early warning sign and a reversible fallback.`,
+        `Check the downside against the supplied starting state: ${context.baseline}`,
       ],
       assumptions: [
         `This is an illustrative downside scenario, not a verified fact or prediction; it assumes an unexpected obstacle could limit progress on ${context.goals}.`,
@@ -44,5 +51,6 @@ export class PessimistAgent implements SpecialistAgent {
       },
       status: "complete",
     };
+    return useLiveAgentExecution(this.name, decision, option, fallback);
   }
 }

@@ -31,10 +31,11 @@ describe("runSimulation", () => {
     expect(report.synthesis.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
     expect(report.synthesis.options[0].timeline.year1).toHaveLength(4);
     expect(report.synthesis.options[0].breakdownScores).toEqual({
-      financialHealth: expect.objectContaining({ value: 50 }),
-      emotionalWellbeing: expect.objectContaining({ value: 50 }),
-      riskLevel: expect.objectContaining({ value: 50 }),
+      financialHealth: expect.objectContaining({ value: 53 }),
+      emotionalWellbeing: expect.objectContaining({ value: 68 }),
+      riskLevel: expect.objectContaining({ value: 4 }),
     });
+    expect(report.stateProjection?.options.map(({ optionId }) => optionId)).toEqual(["A", "B"]);
     expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.question);
     expect(JSON.stringify(log.mock.calls)).not.toContain(sampleDecision.options[0].label);
     expect(SPECIALIST_AGENTS).toHaveLength(4);
@@ -57,6 +58,22 @@ describe("runSimulation", () => {
 
     expect(analyze).toHaveBeenCalledTimes(8);
     log.mockRestore();
+  });
+
+  it("records specialist retry metadata in the matching audit handoff", async () => {
+    const agents: SpecialistAgent[] = SPECIALIST_AGENTS.map((agent) => ({
+      ...agent,
+      analyzeWithMetadata: async (decision, option) => ({
+        result: await agent.analyze(decision, option),
+        retriesUsed: agent.name === "optimist" && option.id === "A" ? 2 : 0,
+      }),
+    }));
+
+    const report = await runSimulation(sampleDecision, agents);
+
+    expect(report.auditLog?.find(({ key }) => key === "optimist:A")?.retriesUsed).toBe(2);
+    expect(report.auditLog?.find(({ key }) => key === "optimist:B")?.retriesUsed).toBe(0);
+    expect(SimulationReportSchema.safeParse(report).success).toBe(true);
   });
 
   it("returns a partial report when an agent returns no output", async () => {

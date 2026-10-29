@@ -17,4 +17,8 @@ export type TimeHorizon = z.infer<typeof TimeHorizonSchema>;
 export interface SpecialistAgent {
   readonly name: AgentName;
   analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult>;
+  analyzeWithMetadata?(decision: DecisionInput, option: DecisionOption): Promise<{
+    result: AgentResult;
+    retriesUsed: number;
+  }>;
 }
