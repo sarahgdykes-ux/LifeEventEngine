@@ -41,29 +41,6 @@ const AGENT_IDENTITY: Record<AgentName, { icon: string; color: string; voice: st
   },
 };
 
-const AGENT_IDENTITY: Record<AgentName, { icon: string; color: string; voice: string }> = {
-  optimist: {
-    icon: "☀️",
-    color: "#f59e0b",
-    voice: "Bright side",
-  },
-  pessimist: {
-    icon: "☁️",
-    color: "#64748b",
-    voice: "What could go wrong",
-  },
-  financial: {
-    icon: "💰",
-    color: "#10b981",
-    voice: "Numbers first",
-  },
-  wellbeing: {
-    icon: "❤️",
-    color: "#ef4444",
-    voice: "How you'll feel",
-  },
-};
-
 const SCORE_LABELS = {
   financialHealth: "Financial health",
   emotionalWellbeing: "Emotional wellbeing",
@@ -113,74 +90,7 @@ function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
     setImportantQuestion(question);
   }
 
-  const [checkedQuestions, setCheckedQuestions] = useState<Set<string>>(new Set());
-  const [importantQuestion, setImportantQuestion] = useState<string | null>(null);
-
-  const REFLECTION_QUESTIONS = [
-    "What would success look like in year 1?",
-    "Which risks keep you up at night?",
-    "Can you afford the transition costs?",
-    "Who would support you through this?",
-    "What would you regret not trying?",
-    "How does this align with your long-term values?",
-  ];
-
-  function toggleQuestion(question: string) {
-    setCheckedQuestions((current) => {
-      const next = new Set(current);
-      if (next.has(question)) {
-        next.delete(question);
-      } else {
-        next.add(question);
-      }
-      return next;
-    });
-  }
-
-  function selectImportantQuestion(question: string) {
-    setImportantQuestion(question);
-  }
-
   return (
-    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} reflection questions`}>
-      <h4 className="questions-title">Questions to ask yourself</h4>
-      <p className="questions-subtitle">Check the questions that matter most to you</p>
-      <ul className="questions-list">
-        {REFLECTION_QUESTIONS.map((question) => (
-          <li key={question} className="question-item">
-            <label className="question-checkbox">
-              <input
-                type="checkbox"
-                checked={checkedQuestions.has(question)}
-                onChange={() => toggleQuestion(question)}
-              />
-              <span>{question}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
-      <div className="important-question-section">
-        <h5 className="important-question-title">Your key question</h5>
-        <p className="important-question-subtitle">Which single question matters most to you right now?</p>
-        <div className="important-question-grid">
-          {REFLECTION_QUESTIONS.map((question) => (
-            <button
-              key={question}
-              className={`important-question-card ${importantQuestion === question ? "important-question-selected" : ""}`}
-              onClick={() => selectImportantQuestion(question)}
-              type="button"
-            >
-              {importantQuestion === question && <span className="check-icon" aria-hidden="true">✓</span>}
-              <span>{question}</span>
-            </button>
-          ))}
-        </div>
-        {importantQuestion && (
-          <p className="important-question-acknowledgment">
-            This question will help guide your reflection.
-          </p>
-        )}
-      </div>
     <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} reflection questions`}>
       <h4 className="questions-title">Questions to ask yourself</h4>
       <p className="questions-subtitle">Check the questions that matter most to you</p>
@@ -304,52 +214,12 @@ function TimelineVisualization({ synthesis, optionLabel }: { synthesis: OptionSy
   );
 }
 
-function TimelineVisualization({ synthesis, optionLabel }: { synthesis: OptionSynthesis; optionLabel: string }) {
-  return (
-    <section className="timeline-visualization" aria-label={`Timeline for ${optionLabel}`}>
-      <h4 className="timeline-title">Timeline projections</h4>
-      <p className="timeline-subtitle">How each specialist sees this option over time</p>
-      <div className="timeline-grid">
-        {HORIZONS.map(([key, label]) => (
-          <div key={key} className="timeline-column">
-            <div className="timeline-header">
-              <span className="timeline-year">{label}</span>
-            </div>
-            <div className="timeline-perspectives">
-              {synthesis.timeline[key].map(({ agent, projection }) => {
-                const identity = AGENT_IDENTITY[agent];
-                return (
-                  <div key={agent} className="timeline-perspective" style={{ borderTopColor: identity.color }}>
-                    <div className="timeline-perspective-header">
-                      <span className="timeline-agent-icon" aria-hidden="true">{identity.icon}</span>
-                      <span className="timeline-agent-name">{AGENT_LABELS[agent]}</span>
-                    </div>
-                    <p className="timeline-projection">{projection}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function AgentResultCard({ result }: { result: AgentResult }) {
   const identity = AGENT_IDENTITY[result.agent];
-
-  const identity = AGENT_IDENTITY[result.agent];
-
   return (
-    <article className={`agent-result agent-result-${result.agent}${result.status === "complete" ? "" : " agent-result-incomplete"}`}>
     <article className={`agent-result agent-result-${result.agent}${result.status === "complete" ? "" : " agent-result-incomplete"}`}>
       <div className="result-title-row">
         <div>
-          <p className="result-kicker" style={{ color: identity.color }}>
-            <span className="agent-icon" aria-hidden="true">{identity.icon}</span>
-            {identity.voice}
-          </p>
           <p className="result-kicker" style={{ color: identity.color }}>
             <span className="agent-icon" aria-hidden="true">{identity.icon}</span>
             {identity.voice}
@@ -430,11 +300,9 @@ function OptionPerspective({
   option,
   results,
   synthesis,
-  synthesis,
 }: {
   option: DecisionInput["options"][number];
   results: SimulationReport["results"];
-  synthesis?: OptionSynthesis;
   synthesis?: OptionSynthesis;
 }) {
   return (
@@ -444,7 +312,6 @@ function OptionPerspective({
         <span>{option.label}</span>
       </h3>
       {option.description && <p className="option-perspective-description">{option.description}</p>}
-      {synthesis && <TimelineVisualization synthesis={synthesis} optionLabel={option.label} />}
       {synthesis && <TimelineVisualization synthesis={synthesis} optionLabel={option.label} />}
       <div className="option-agent-results">
         {AGENT_NAMES.map((agent) => {
@@ -597,31 +464,6 @@ export default function SimulationReportView({ report, decision }: SimulationRep
         <div className="option-perspective-grid">
           {decision.options.map((option) => {
             const synthesis = report.synthesis?.options.find((s) => s.optionId === option.id);
-            return (
-              <OptionPerspective key={option.id} option={option} results={report.results} synthesis={synthesis} />
-            );
-          })}
-        </div>
-      </section>
-
-      <details className="developer-audit">
-        <summary>Developer audit view</summary>
-        <p>Validated handoff records and raw structured outputs returned by each specialist.</p>
-        <div className="audit-tabs" role="tablist" aria-label="Raw agent outputs">
-          {AGENT_NAMES.map((agent) => (
-            <button
-              aria-selected={auditAgent === agent}
-              id={`audit-tab-${agent}`}
-              key={agent}
-              onClick={() => setAuditAgent(agent)}
-              role="tab"
-              type="button"
-            >{AGENT_LABELS[agent]}</button>
-          ))}
-        </div>
-        <section aria-labelledby={`audit-tab-${auditAgent}`} className="audit-panel" role="tabpanel">
-          {report.results.filter(({ agent }) => agent === auditAgent).map((result) => {
-            const handoff = report.auditLog?.find((entry) => entry.key === `${result.agent}:${result.optionId}`);
             return (
               <OptionPerspective key={option.id} option={option} results={report.results} synthesis={synthesis} />
             );
