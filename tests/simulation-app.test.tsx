@@ -18,9 +18,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function fillDecisionForm() {
-  fireEvent.change(screen.getByLabelText("What decision are you facing?"), {
+  fireEvent.change(screen.getByLabelText("Your question"), {
     target: { value: sampleDecision.question },
   });
+  fireEvent.click(screen.getByRole("button", { name: "Next →" }));
   fireEvent.change(screen.getByLabelText("Option A label"), {
     target: { value: sampleDecision.options[0].label },
   });
@@ -33,19 +34,21 @@ function fillDecisionForm() {
   fireEvent.change(screen.getByLabelText("Option B description"), {
     target: { value: sampleDecision.options[1].description },
   });
-  fireEvent.change(screen.getByLabelText("Goals"), {
-    target: { value: sampleDecision.goals.join(", ") },
-  });
-  fireEvent.change(screen.getByLabelText("Priorities"), {
-    target: { value: sampleDecision.priorities.join(", ") },
-  });
-  fireEvent.change(screen.getByLabelText("Other constraints (optional)"), {
-    target: {
-      value: (Array.isArray(sampleDecision.constraints)
-        ? sampleDecision.constraints
-        : sampleDecision.constraints.other).join(", "),
-    },
-  });
+  fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+  const lists = [
+    [/^Goals/, sampleDecision.goals],
+    [/^Priorities/, sampleDecision.priorities],
+    [/^Other constraints/, Array.isArray(sampleDecision.constraints) ? sampleDecision.constraints : sampleDecision.constraints.other],
+  ] as const;
+  for (const [label, items] of lists) {
+    const input = screen.getByLabelText(label);
+    for (const item of items) {
+      fireEvent.change(input, { target: { value: item } });
+      fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    }
+  }
+  fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+  fireEvent.click(screen.getByRole("button", { name: "Next →" }));
 }
 
 function makePartialReport(): SimulationReport {
@@ -103,7 +106,7 @@ describe("SimulationApp", () => {
 
     expect(await screen.findByText("Complete report")).toBeTruthy();
     expect(screen.getByText(/All eight specialist results passed validation/)).toBeTruthy();
-    expect(screen.getAllByText("SPECIALIST PERSPECTIVE")).toHaveLength(8);
+    expect(screen.getAllByRole("heading", { name: "Optimist" })).toHaveLength(2);
     expect(screen.getAllByText("Key findings by perspective")).toHaveLength(2);
     expect(screen.getAllByText("Trade-offs to consider")).toHaveLength(2);
     expect(screen.getAllByText("Direct disagreements")).toHaveLength(2);
@@ -195,8 +198,7 @@ describe("SimulationApp", () => {
     expect(screen.getAllByText(/not returned ·/)).toHaveLength(7);
     expect(screen.getAllByText(/No validated result was returned/)).toHaveLength(7);
     expect(screen.queryByText("At-a-glance comparison")).toBeNull();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
-      .toBe(sampleDecision.question);
+    expect(screen.getAllByText(sampleDecision.question).length).toBeGreaterThan(0);
   });
 
   it("renders a failed report with every unavailable result identified", async () => {
@@ -238,13 +240,16 @@ describe("SimulationApp", () => {
   it("shows validation errors without clearing the form", () => {
     render(<SimulationApp />);
     fillDecisionForm();
-    fireEvent.change(screen.getByLabelText("Goals"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Build a meaningful career" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Feel engaged in daily life" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next →" }));
 
-    fireEvent.submit(document.querySelector("form")!);
-
-    expect(screen.getByText("Enter at least one goal and one priority, separated by commas.")).toBeTruthy();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
-      .toBe(sampleDecision.question);
+    expect(screen.getByText("At least one goal is required")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    fireEvent.click(screen.getByRole("button", { name: "← Back" }));
+    expect((screen.getByLabelText("Your question") as HTMLInputElement).value).toBe(sampleDecision.question);
   });
 
   it("explains when the request exceeds the server size limit", async () => {
@@ -260,8 +265,7 @@ describe("SimulationApp", () => {
       "Decision details exceed the request size limit. Shorten the text or remove list items and try again.",
     )).toBeTruthy();
     expect(screen.queryByText("Request body exceeds the 32 KB limit.")).toBeNull();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
-      .toBe(sampleDecision.question);
+    expect(screen.getAllByText(sampleDecision.question).length).toBeGreaterThan(0);
   });
 
   it("does not expose server error details or stack traces", async () => {
@@ -278,8 +282,7 @@ describe("SimulationApp", () => {
 
     expect(await screen.findByText("The simulation is temporarily unavailable. Please try again.")).toBeTruthy();
     expect(screen.queryByText(/private token|database failed|route\.ts:14/)).toBeNull();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
-      .toBe(sampleDecision.question);
+    expect(screen.getAllByText(sampleDecision.question).length).toBeGreaterThan(0);
   });
 
   it("shows an unexpected-response error for an invalid successful payload", async () => {
@@ -293,7 +296,7 @@ describe("SimulationApp", () => {
     fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
 
     expect(await screen.findByText("The simulation returned an unexpected report. Please try again.")).toBeTruthy();
-    expect(screen.queryByText("Complete report")).toBeNull();
+    expect(screen.queryByRole("status", { name: "Complete report" })).toBeNull();
   });
 
   it("shows a network error and preserves the entered decision", async () => {
@@ -306,8 +309,7 @@ describe("SimulationApp", () => {
     expect(await screen.findByText("Could not connect to the simulation. Check your connection and try again."))
       .toBeTruthy();
     expect(screen.queryByText("network details")).toBeNull();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value)
-      .toBe(sampleDecision.question);
+    expect(screen.getAllByText(sampleDecision.question).length).toBeGreaterThan(0);
   });
 
   it("starts a fresh simulation after the app is refreshed", async () => {
@@ -322,8 +324,8 @@ describe("SimulationApp", () => {
     render(<SimulationApp />);
 
     expect(screen.getByText("A little clarity starts here.")).toBeTruthy();
-    expect((screen.getByLabelText("What decision are you facing?") as HTMLInputElement).value).toBe("");
-    expect((screen.getByRole("button", { name: /Explore this decision/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByLabelText("Your question") as HTMLInputElement).value).toBe("");
+    expect((screen.getByRole("button", { name: "Next →" }) as HTMLButtonElement).disabled).toBe(false);
 
     fillDecisionForm();
     fireEvent.click(screen.getByRole("button", { name: /Explore this decision/ }));
