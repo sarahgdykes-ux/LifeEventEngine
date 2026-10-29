@@ -20,9 +20,6 @@ export class WellbeingAgent implements SpecialistAgent {
       optionId: option.id,
       findings: [
         `For "${context.question}", consider how the day-to-day experience of ${context.option} could support or strain the goal of ${context.goals}, and how that fits the priority of ${context.priorities}.`,
-        hasConstraints
-          ? `Explore likely effects to monitor in stress, relationships, health, and routine, especially where the constraint(s) ${context.constraints} might add pressure.`
-          : `Explore likely effects to monitor in stress, relationships, health, and routine.`,
         `Explore likely effects to monitor in stress, relationships, health, and routine, especially where the constraint(s) ${context.constraints} might add pressure.`,
         `Compare any assumed wellbeing changes with the user-supplied starting point: ${context.baseline}`,
       ],
