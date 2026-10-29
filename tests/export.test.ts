@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createTimelineExportData,
   downloadJSONReport,
@@ -14,6 +14,8 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
+beforeEach(() => vi.stubEnv("LLM_PROVIDER", "mock"));
+
 describe("simulation report exports", () => {
   it("builds export data with decision, projections, stat deltas, and retry metadata", async () => {
     const report = await runSimulation(sampleDecision);
@@ -27,6 +29,7 @@ describe("simulation report exports", () => {
     expect(data.horizonYears).toEqual([1, 5, 10]);
     expect(data.statDeltas.A.year1).toEqual({ finances: -6, wellbeing: -2, health: 0, career: 3 });
     expect(data.agentSummaries.find(({ agentId, optionId }) => agentId === "optimist" && optionId === "A")?.retriesUsed).toBe(2);
+    expect(data.agentSummaries.find(({ agentId, optionId }) => agentId === "optimist" && optionId === "A")?.source).toBe("deterministic_fallback");
     expect(data.report).toEqual(report);
   });
 
@@ -40,7 +43,7 @@ describe("simulation report exports", () => {
     expect(markdown).toContain("## Option A: Go to graduate school");
     expect(markdown).toContain("- Financial health: 53/100");
     expect(markdown).toContain("Year 1: finances: -6, wellbeing: -2, health: 0, career: +3");
-    expect(markdown).toContain("### OPTIMIST · Option A (Retries: 0)");
+    expect(markdown).toContain("### OPTIMIST · Option A (Source: deterministic_fallback; Retries: 0)");
     expect(markdown).toContain("- Year 10:");
     expect(markdown).toContain("not predictions or professional advice");
   });

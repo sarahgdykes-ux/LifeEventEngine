@@ -5,6 +5,7 @@ import {
   OPTION_IDS,
   OptionIdSchema,
   TIME_HORIZONS,
+  AgentExecutionSourceSchema,
   type AgentName,
 } from "@/lib/agents/types";
 import { AvatarStateSchema } from "@/lib/events/state-schema";
@@ -186,6 +187,7 @@ export const HandoffAuditEntrySchema = z.object({
   outcome: z.enum(["accepted", "rejected", "started"]),
   detail: z.string().min(1),
   retriesUsed: z.number().int().nonnegative().optional(),
+  source: AgentExecutionSourceSchema.optional(),
 });
 
 const StateHorizonProjectionSchema = z.object({

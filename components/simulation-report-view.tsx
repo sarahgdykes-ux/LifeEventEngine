@@ -258,14 +258,17 @@ function MissingResultCard({ agent, optionId }: { agent: AgentName; optionId: Op
 function AuditResultCard({
   result,
   retriesUsed,
+  source,
 }: {
   result: AgentResult;
   retriesUsed: number;
+  source?: "live_provider" | "deterministic_fallback";
 }) {
   return (
     <article className="audit-result-card">
       <div className="audit-result-heading">
         <strong>{AGENT_LABELS[result.agent]} · Option {result.optionId}</strong>
+        {source && <span className={`source-badge source-badge-${source}`}>{source}</span>}
         <span className={`retry-badge${retriesUsed > 0 ? " retry-badge-used" : " retry-badge-clean"}`}>
           {retriesUsed > 0 ? `${retriesUsed} ${retriesUsed === 1 ? "retry" : "retries"} required` : "0 retries (clean)"}
         </span>
@@ -472,6 +475,7 @@ export default function SimulationReportView({ report, decision }: SimulationRep
                 key={result.optionId}
                 result={result}
                 retriesUsed={handoff?.retriesUsed ?? 0}
+                source={handoff?.source}
               />
             );
           })}
@@ -479,7 +483,7 @@ export default function SimulationReportView({ report, decision }: SimulationRep
         <h4>Handoff audit log</h4>
         {report.auditLog?.length ? (
           <ol className="audit-log">{report.auditLog.map((entry, index) => (
-            <li key={`${entry.key}-${index}`}><code>{entry.stage} · {entry.outcome} · {entry.key}</code><span>{entry.detail}</span></li>
+            <li key={`${entry.key}-${index}`}><code>{entry.stage} · {entry.outcome} · {entry.key}{entry.source ? ` · ${entry.source}` : ""}</code><span>{entry.detail}</span></li>
           ))}</ol>
         ) : <p>No handoff audit records were included in this report.</p>}
       </details>

@@ -14,11 +14,16 @@ export const TIME_HORIZONS = ["year1", "year5", "year10"] as const;
 export const TimeHorizonSchema = z.enum(TIME_HORIZONS);
 export type TimeHorizon = z.infer<typeof TimeHorizonSchema>;
 
+export const AGENT_EXECUTION_SOURCES = ["live_provider", "deterministic_fallback"] as const;
+export const AgentExecutionSourceSchema = z.enum(AGENT_EXECUTION_SOURCES);
+export type AgentExecutionSource = z.infer<typeof AgentExecutionSourceSchema>;
+
 export interface SpecialistAgent {
   readonly name: AgentName;
   analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult>;
   analyzeWithMetadata?(decision: DecisionInput, option: DecisionOption): Promise<{
     result: AgentResult;
     retriesUsed: number;
+    source: AgentExecutionSource;
   }>;
 }

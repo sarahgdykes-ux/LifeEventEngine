@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { AGENT_NAMES, OPTION_IDS, type SpecialistAgent } from "@/lib/agents/types";
+import { AGENT_NAMES, OPTION_IDS, type AgentExecutionSource, type SpecialistAgent } from "@/lib/agents/types";
 import { FinancialAgent } from "@/lib/agents/financial";
 import { OptimistAgent } from "@/lib/agents/optimist";
 import { PessimistAgent } from "@/lib/agents/pessimist";
@@ -25,6 +25,7 @@ interface AgentAttempt {
   result?: AgentResult;
   matchesRequestedKey: boolean;
   retriesUsed: number;
+  source?: AgentExecutionSource;
 }
 
 export async function runSimulation(
@@ -51,14 +52,17 @@ export async function runSimulation(
     const requestedKey = `${agent.name}:${option.id}`;
     let output: unknown;
     let retriesUsed = 0;
+    let source: AgentExecutionSource | undefined;
 
     try {
       if (agent.analyzeWithMetadata) {
         const execution = await agent.analyzeWithMetadata(decision, option);
         output = execution.result;
         retriesUsed = execution.retriesUsed;
+        source = execution.source;
       } else {
         output = await agent.analyze(decision, option);
+        source = "deterministic_fallback";
       }
     } catch (error) {
       auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Agent execution failed." });
@@ -74,7 +78,7 @@ export async function runSimulation(
     try {
       result = validateAgentResult(output);
     } catch {
-      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation.", retriesUsed });
+      auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "rejected", detail: "Output failed schema validation.", retriesUsed, source });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "invalid_output",
@@ -97,23 +101,23 @@ export async function runSimulation(
 
     const matchesRequestedKey = result.agent === agent.name && result.optionId === option.id;
     if (!matchesRequestedKey) {
-      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff.", retriesUsed });
+      auditLog.push({ key: requestedKey, stage: "handoff", outcome: "rejected", detail: "Agent or option key did not match the requested handoff.", retriesUsed, source });
       console.error("Simulation agent result rejected", {
         key: requestedKey,
         failureType: "key_mismatch",
         schemaValid: true,
       });
-      return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
+      return { result, matchesRequestedKey, retriesUsed, source } satisfies AgentAttempt;
     }
 
-    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation.", retriesUsed });
+    auditLog.push({ key: requestedKey, stage: "agent_output", outcome: "accepted", detail: "Output passed schema and requested-key validation.", retriesUsed, source });
 
     console.info("Simulation agent output schema validated", {
       agent: result.agent,
       optionId: result.optionId,
       schemaValid: true,
     });
-    return { result, matchesRequestedKey, retriesUsed } satisfies AgentAttempt;
+    return { result, matchesRequestedKey, retriesUsed, source } satisfies AgentAttempt;
   })));
 
   const attemptsByResultKey = new Map<string, AgentAttempt[]>();

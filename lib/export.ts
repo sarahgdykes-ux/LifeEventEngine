@@ -1,4 +1,4 @@
-import type { AgentName } from "@/lib/agents/types";
+import type { AgentExecutionSource, AgentName } from "@/lib/agents/types";
 import type { DecisionInput } from "@/lib/schemas/decision";
 import type { AgentResult, SimulationReport } from "@/lib/schemas/simulation";
 
@@ -23,6 +23,7 @@ export interface TimelineExportData {
     narrative: string;
     projections: AgentResult["projections"];
     retriesUsed: number;
+    source?: AgentExecutionSource;
   }[];
 }
 
@@ -60,6 +61,7 @@ export function createTimelineExportData(
     ].join("\n"),
     projections: result.projections,
     retriesUsed: report.auditLog?.find(({ key }) => key === `${result.agent}:${result.optionId}`)?.retriesUsed ?? 0,
+    source: report.auditLog?.find(({ key }) => key === `${result.agent}:${result.optionId}`)?.source,
   }));
 
   return {
@@ -119,7 +121,7 @@ export function generateMarkdownReport(data: TimelineExportData): string {
   }).join("\n\n---\n\n");
 
   const agentSections = data.agentSummaries.map((summary) => [
-    `### ${summary.agentId.toUpperCase()} · Option ${summary.optionId} (Retries: ${summary.retriesUsed})`,
+    `### ${summary.agentId.toUpperCase()} · Option ${summary.optionId} (Source: ${summary.source ?? "unknown"}; Retries: ${summary.retriesUsed})`,
     summary.narrative,
     "",
     `- Year 1: ${summary.projections.year1}`,
