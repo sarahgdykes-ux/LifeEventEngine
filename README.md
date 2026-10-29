@@ -150,10 +150,10 @@ The server limits requests to 32 KiB, question and option descriptions to 1,000 
 
 ## Limitations and future work
 
-- Specialist outputs are static templates, not personalized expert analysis or live AI responses.
+- Mock mode uses deterministic specialist templates. Optional live mode can use a configured model provider, but outputs are not professional advice or independently verified analysis.
 - Scores are deterministic indicators derived from the user-entered baseline and scenario deltas; they are not measured, calibrated, or validated assessments.
 - Projections are prompts for reflection, not forecasts. Confidence is self-reported and is not a calibrated probability.
 - Agreement and disagreement detection is deliberately narrow and lexical; nuanced or semantic conflicts may not be detected.
-- There is no authentication, persistence, or request rate limiting. Do not enter highly sensitive information into a publicly exposed instance.
-- Form data is held in the browser for the current page and is not saved; refreshing starts a fresh session.
+- There is no authentication, database, server-side persistence, or request rate limiting. The UI stores up to 20 decision-history entries in browser `localStorage`; this history stays in that browser profile and is not synced to a server. Avoid highly sensitive information, especially when live mode sends inputs to a model provider.
+- Decision history is stored locally in browser `localStorage`. The current form and generated report are not saved to a server; browser storage can be cleared by the user or browser.
 - Future work, if this prototype advances, should include user research, clearer domain-specific guardrails, appropriate privacy/security review, and evaluation of any grounded scoring or AI integration before being represented as advice.
