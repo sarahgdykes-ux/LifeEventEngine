@@ -284,7 +284,7 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
             health: baseline.health,
             career: baseline.career,
           },
-          commitments: values.constraints.join(", "),
+          commitments: baseline.commitments.split(",").map((s) => s.trim()).filter(Boolean),
         },
         scenarioEffects: scenarioValues.map(({ optionId, horizons, newCommitments, endedCommitments }) => ({
           optionId,
