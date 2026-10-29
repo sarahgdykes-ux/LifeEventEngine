@@ -17,9 +17,7 @@ export class OptimistAgent implements SpecialistAgent {
       agent: this.name,
       optionId: option.id,
       findings: [
-        `Illustrative possibility: pursuing ${option.label} could create useful opportunities to advance the decision's goals. This is a reflection prompt, not a factual prediction.`,
         `Illustrative possibility: ${option.label} could create useful opportunities to pursue the decision's goals. This is a reflection prompt, not a factual prediction.`,
-        `Use the shared starting-state assumptions as a progress baseline: ${context.baseline}`,
       ],
       assumptions: [
         `This scenario assumes the person can make a sustained effort toward this option while adapting as circumstances change.`,
