@@ -9,6 +9,7 @@ export class FinancialAgent implements SpecialistAgent {
   async analyze(decision: DecisionInput, option: DecisionOption): Promise<AgentResult> {
     const context = describeDecisionContext(decision, option);
     const hasConstraints = context.constraints !== "No specific constraints supplied";
+    const hasConstraints = context.constraints !== "No specific constraints supplied";
 
     return {
       agent: this.name,
@@ -27,9 +28,15 @@ export class FinancialAgent implements SpecialistAgent {
         hasConstraints
           ? `The financial effect of ${context.option} depends on actual costs, income changes, available resources, and any omitted costs associated with the stated constraints (${context.constraints}).`
           : `The financial effect of ${context.option} depends on actual costs, income changes, available resources, and any omitted costs.`,
+        hasConstraints
+          ? `The financial effect of ${context.option} depends on actual costs, income changes, available resources, and any omitted costs associated with the stated constraints (${context.constraints}).`
+          : `The financial effect of ${context.option} depends on actual costs, income changes, available resources, and any omitted costs.`,
         `The prompt does not say what financial trade-offs the user would accept to pursue ${context.goals}.`,
       ],
       projections: {
+        year1: hasConstraints
+          ? `Illustrative checkpoint, not a forecast: list transition costs for ${context.option} and compare monthly income and expenses with the constraint(s) ${context.constraints}.`
+          : `Illustrative checkpoint, not a forecast: list transition costs for ${context.option} and compare monthly income and expenses.`,
         year1: hasConstraints
           ? `Illustrative checkpoint, not a forecast: list transition costs for ${context.option} and compare monthly income and expenses with the constraint(s) ${context.constraints}.`
           : `Illustrative checkpoint, not a forecast: list transition costs for ${context.option} and compare monthly income and expenses.`,
