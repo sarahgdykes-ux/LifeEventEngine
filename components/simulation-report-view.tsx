@@ -19,26 +19,10 @@ const AGENT_LABELS: Record<AgentName, string> = {
 };
 
 const AGENT_IDENTITY: Record<AgentName, { icon: string; color: string; voice: string }> = {
-  optimist: {
-    icon: "☀️",
-    color: "#f59e0b",
-    voice: "Bright side",
-  },
-  pessimist: {
-    icon: "☁️",
-    color: "#64748b",
-    voice: "What could go wrong",
-  },
-  financial: {
-    icon: "💰",
-    color: "#10b981",
-    voice: "Numbers first",
-  },
-  wellbeing: {
-    icon: "❤️",
-    color: "#ef4444",
-    voice: "How you'll feel",
-  },
+  optimist: { icon: "☀️", color: "#f59e0b", voice: "Bright side" },
+  pessimist: { icon: "☁️", color: "#64748b", voice: "What could go wrong" },
+  financial: { icon: "💰", color: "#10b981", voice: "Numbers first" },
+  wellbeing: { icon: "❤️", color: "#ef4444", voice: "How you might feel" },
 };
 
 const SCORE_LABELS = {
@@ -62,10 +46,22 @@ const TRADEOFF_LABELS = {
 } as const;
 
 function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
+  return (
+    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} overview scores`}>
+      {Object.entries(synthesis.breakdownScores).map(([name, score]) => (
+        <article className="score-card" key={name}>
+          <div><h4>{SCORE_LABELS[name as keyof typeof SCORE_LABELS]}</h4><strong>{score.value}<span>/100</span></strong></div>
+          <p>{score.rationale}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function ReflectionQuestions({ optionId }: { optionId: OptionId }) {
   const [checkedQuestions, setCheckedQuestions] = useState<Set<string>>(new Set());
   const [importantQuestion, setImportantQuestion] = useState<string | null>(null);
-
-  const REFLECTION_QUESTIONS = [
+  const questions = [
     "What would success look like in year 1?",
     "Which risks keep you up at night?",
     "Can you afford the transition costs?",
@@ -77,32 +73,21 @@ function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
   function toggleQuestion(question: string) {
     setCheckedQuestions((current) => {
       const next = new Set(current);
-      if (next.has(question)) {
-        next.delete(question);
-      } else {
-        next.add(question);
-      }
+      if (next.has(question)) next.delete(question);
+      else next.add(question);
       return next;
     });
   }
 
-  function selectImportantQuestion(question: string) {
-    setImportantQuestion(question);
-  }
-
   return (
-    <section className="breakdown-scores" aria-label={`Option ${synthesis.optionId} reflection questions`}>
+    <section className="reflection-questions" aria-label={`Option ${optionId} reflection questions`}>
       <h4 className="questions-title">Questions to ask yourself</h4>
       <p className="questions-subtitle">Check the questions that matter most to you</p>
       <ul className="questions-list">
-        {REFLECTION_QUESTIONS.map((question) => (
+        {questions.map((question) => (
           <li key={question} className="question-item">
             <label className="question-checkbox">
-              <input
-                type="checkbox"
-                checked={checkedQuestions.has(question)}
-                onChange={() => toggleQuestion(question)}
-              />
+              <input type="checkbox" checked={checkedQuestions.has(question)} onChange={() => toggleQuestion(question)} />
               <span>{question}</span>
             </label>
           </li>
@@ -112,23 +97,20 @@ function BreakdownScores({ synthesis }: { synthesis: OptionSynthesis }) {
         <h5 className="important-question-title">Your key question</h5>
         <p className="important-question-subtitle">Which single question matters most to you right now?</p>
         <div className="important-question-grid">
-          {REFLECTION_QUESTIONS.map((question) => (
+          {questions.map((question) => (
             <button
               key={question}
               className={`important-question-card ${importantQuestion === question ? "important-question-selected" : ""}`}
-              onClick={() => selectImportantQuestion(question)}
+              onClick={() => setImportantQuestion(question)}
               type="button"
+              aria-pressed={importantQuestion === question}
             >
               {importantQuestion === question && <span className="check-icon" aria-hidden="true">✓</span>}
               <span>{question}</span>
             </button>
           ))}
         </div>
-        {importantQuestion && (
-          <p className="important-question-acknowledgment">
-            This question will help guide your reflection.
-          </p>
-        )}
+        {importantQuestion && <p className="important-question-acknowledgment">This question will help guide your reflection.</p>}
       </div>
     </section>
   );
@@ -190,9 +172,7 @@ function TimelineVisualization({ synthesis, optionLabel }: { synthesis: OptionSy
       <div className="timeline-grid">
         {HORIZONS.map(([key, label]) => (
           <div key={key} className="timeline-column">
-            <div className="timeline-header">
-              <span className="timeline-year">{label}</span>
-            </div>
+            <div className="timeline-header"><span className="timeline-year">{label}</span></div>
             <div className="timeline-perspectives">
               {synthesis.timeline[key].map(({ agent, projection }) => {
                 const identity = AGENT_IDENTITY[agent];
@@ -221,8 +201,7 @@ function AgentResultCard({ result }: { result: AgentResult }) {
       <div className="result-title-row">
         <div>
           <p className="result-kicker" style={{ color: identity.color }}>
-            <span className="agent-icon" aria-hidden="true">{identity.icon}</span>
-            {identity.voice}
+            <span className="agent-icon" aria-hidden="true">{identity.icon}</span> {identity.voice}
           </p>
           <h4>{AGENT_LABELS[result.agent]}</h4>
         </div>
@@ -425,7 +404,7 @@ export default function SimulationReportView({ report, decision }: SimulationRep
       {report.synthesis && (
         <section className="report-overview" aria-labelledby="report-overview-heading">
           <h3 id="report-overview-heading">At-a-glance comparison</h3>
-          <p className="score-explanation">Use these questions to guide your reflection, not as predictions or advice.</p>
+          <p className="score-explanation">Scores are neutral placeholders for discussion, not measured predictions or advice. Higher risk means greater downside exposure.</p>
           <div className="overview-options">
             {report.synthesis.options.map((synthesis) => {
               const option = decision.options.find(({ id }) => id === synthesis.optionId);
@@ -433,6 +412,7 @@ export default function SimulationReportView({ report, decision }: SimulationRep
                 <section className="overview-option" key={option.id} aria-label={`Option ${option.id}: ${option.label}`}>
                   <h4><span className={`option-marker option-marker-${option.id.toLowerCase()}`}>{option.id}</span>{option.label}</h4>
                   <BreakdownScores synthesis={synthesis} />
+                  <ReflectionQuestions optionId={synthesis.optionId} />
                   <NarratorComparison synthesis={synthesis} />
                 </section>
               );
@@ -463,10 +443,8 @@ export default function SimulationReportView({ report, decision }: SimulationRep
         </div>
         <div className="option-perspective-grid">
           {decision.options.map((option) => {
-            const synthesis = report.synthesis?.options.find((s) => s.optionId === option.id);
-            return (
-              <OptionPerspective key={option.id} option={option} results={report.results} synthesis={synthesis} />
-            );
+            const synthesis = report.synthesis?.options.find(({ optionId }) => optionId === option.id);
+            return <OptionPerspective key={option.id} option={option} results={report.results} synthesis={synthesis} />;
           })}
         </div>
       </section>

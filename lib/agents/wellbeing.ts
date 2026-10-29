@@ -13,7 +13,6 @@ export class WellbeingAgent implements SpecialistAgent {
 
   async analyzeWithMetadata(decision: DecisionInput, option: DecisionOption) {
     const context = describeDecisionContext(decision, option);
-    const hasConstraints = context.constraints !== "No specific constraints supplied";
 
     const fallback: AgentResult = {
       agent: this.name,
@@ -33,9 +32,7 @@ export class WellbeingAgent implements SpecialistAgent {
       ],
       projections: {
         year1: `Illustrative check-in, not a forecast: notice how settling into ${context.option} affects stress, connection, health, and the goal of ${context.goals}.`,
-        year5: hasConstraints
-          ? `Illustrative check-in, not a forecast: revisit whether the routine and relationships associated with ${context.option} still support ${context.priorities} within ${context.constraints}.`
-          : `Illustrative check-in, not a forecast: revisit whether the routine and relationships associated with ${context.option} still support ${context.priorities}.`,
+        year5: `Illustrative check-in, not a forecast: revisit whether the routine and relationships associated with ${context.option} still support ${context.priorities} within ${context.constraints}.`,
         year10: `Illustrative check-in, not a forecast: reassess whether ${context.option} continues to feel aligned with ${context.goals}, since wellbeing and priorities can change.`,
       },
       scores: {

@@ -152,7 +152,7 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [currentStep, setCurrentStep] = useState(1);
-  const TOTAL_STEPS = 4;
+  const TOTAL_STEPS = 5;
 
   const [baseline, setBaseline] = useState({
     name: "Alex",
@@ -263,7 +263,7 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (validateStep(4)) {
+    if (validateStep(3) && validateStep(4)) {
       setValidationMessage(null);
       setFieldErrors({});
       onSubmit({
@@ -284,7 +284,7 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
             health: baseline.health,
             career: baseline.career,
           },
-          commitments: baseline.commitments.split(",").map((s) => s.trim()).filter(Boolean),
+          commitments: baseline.commitments.split(",").map((commitment) => commitment.trim()).filter(Boolean),
         },
         scenarioEffects: scenarioValues.map(({ optionId, horizons, newCommitments, endedCommitments }) => ({
           optionId,
@@ -299,7 +299,7 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
     <form className="decision-form decision-form-stepped" onSubmit={handleSubmit} aria-busy={loading} noValidate>
       <div className="progress-bar">
         <div className="progress-track">
-          {[1, 2, 3, 4].map((step) => (
+          {[1, 2, 3, 4, 5].map((step) => (
             <div
               key={step}
               className={`progress-step ${step <= currentStep ? "progress-step-active" : ""} ${step === currentStep ? "progress-step-current" : ""}`}
@@ -309,7 +309,8 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
                 {step === 1 && "Your decision"}
                 {step === 2 && "Two options"}
                 {step === 3 && "What matters"}
-                {step === 4 && "Review"}
+                {step === 4 && "State & assumptions"}
+                {step === 5 && "Review"}
               </span>
             </div>
           ))}
@@ -443,6 +444,38 @@ export default function DecisionForm({ loading, onSubmit, initialData }: Decisio
       )}
 
       {currentStep === 4 && (
+        <div className="form-step">
+          <h3 className="step-title">Starting point and assumptions</h3>
+          <p className="step-description">Adjust the shared baseline and projected stat changes. Defaults are neutral; these assumptions drive the deterministic state projections.</p>
+          <fieldset className="form-section">
+            <legend>Shared baseline state</legend>
+            <div className="option-grid">
+              <label className="field-label">Character name<input aria-label="Character name" value={baseline.name} onChange={(e) => updateBaseline("name", e.target.value)} /></label>
+              <label className="field-label">Age<input aria-label="Age" type="number" min="1" max="120" value={baseline.age} onChange={(e) => updateBaseline("age", e.target.value)} /></label>
+              <label className="field-label">Current year<input aria-label="Current year" type="number" min="1900" max="2200" value={baseline.year} onChange={(e) => updateBaseline("year", e.target.value)} /></label>
+              <label className="field-label">Background<textarea aria-label="Background" value={baseline.background} onChange={(e) => updateBaseline("background", e.target.value)} /></label>
+            </div>
+            <div className="option-grid">
+              {STAT_FIELDS.map((stat) => <label className="field-label" key={stat}>{stat[0].toUpperCase() + stat.slice(1)} (0–100)<input aria-label={`Baseline ${stat}`} type="number" min="0" max="100" value={baseline[stat]} onChange={(e) => updateBaseline(stat, e.target.value)} /></label>)}
+            </div>
+            <label className="field-label">Active commitments (comma-separated)<input aria-label="Active commitments" value={baseline.commitments} onChange={(e) => updateBaseline("commitments", e.target.value)} /></label>
+          </fieldset>
+          {(["A", "B"] as const).map((optionId) => {
+            const scenario = scenarioValues.find((item) => item.optionId === optionId)!;
+            return <fieldset className="form-section" key={optionId}>
+              <legend>Assumptions for Option {optionId}: {optionId === "A" ? values.optionALabel || "Option A" : values.optionBLabel || "Option B"}</legend>
+              {HORIZONS.map(([horizon, title]) => <div className="option-grid" key={horizon}>
+                <h4>{title}</h4>
+                {STAT_FIELDS.map((stat) => <label className="field-label" key={stat}>{stat} change<input aria-label={`Option ${optionId} ${title} ${stat} change`} type="number" min="-20" max="20" value={scenario.horizons[horizon][stat]} onChange={(e) => updateScenario(optionId, (current) => ({ ...current, horizons: { ...current.horizons, [horizon]: { ...current.horizons[horizon], [stat]: Number(e.target.value) } } }))} /></label>)}
+              </div>)}
+              <label className="field-label">New commitments<input aria-label={`Option ${optionId} new commitments`} value={scenario.newCommitments} onChange={(e) => updateScenario(optionId, (current) => ({ ...current, newCommitments: e.target.value }))} /></label>
+              <label className="field-label">Commitments ending<input aria-label={`Option ${optionId} ended commitments`} value={scenario.endedCommitments} onChange={(e) => updateScenario(optionId, (current) => ({ ...current, endedCommitments: e.target.value }))} /></label>
+            </fieldset>;
+          })}
+        </div>
+      )}
+
+      {currentStep === 5 && (
         <div className="form-step">
           <h3 className="step-title">Review your decision</h3>
           <p className="step-description">Make sure everything looks correct before you explore the perspectives.</p>
